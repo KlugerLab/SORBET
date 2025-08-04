@@ -53,6 +53,7 @@ def create_data_split_record(split: List[Tuple[list]], output_directory: str) ->
 
     return split, record 
 
+# A bit confused how this is called after create_data_split_record if create_data_split_record Creates a new directory with a pre-defined structure. probably the latter docstring needs an update.
 def load_data_split_record(directory: str):
     """Loads a previously dumped data split from a pre-specified directory structure. 
     NOTE: Called after create_data_split_record.
