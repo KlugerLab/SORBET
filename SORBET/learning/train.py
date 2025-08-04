@@ -29,6 +29,7 @@ _training_hyperparamters_types = [
         ('restarts', int, False)
         ]
 
+# This is a repeat of a comment from before but I think that functions that are used by users freq (like this) should have argument option names in the docstring
 def train_model(
         model_type, model_init_params: Dict[str, Any], 
         dataset: List[TorchOmicsDataset],
