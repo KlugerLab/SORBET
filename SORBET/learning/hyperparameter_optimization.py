@@ -22,9 +22,6 @@ from .hyperparameter_optimization_utils import get_model_and_training_specificat
 
 from .predict import predict_graphs_from_subgraphs
 
-# TODO: more hyperparameter to consider: percentile,normalization, morphological features
-# TODO: ModelParamters structure is brittle. Improve. 
-
 def objective(config: Dict[str, any], data_split: List[Tuple[list]], root_fpath: str, metadata_files: Any, 
         model_type: Any, in_data_dimension: int, random_seed: Optional[int] = None, tensorboard: Optional[str] = None):
     """The standard objective function, defined for use with Ray / Optuna.
@@ -62,10 +59,9 @@ def objective(config: Dict[str, any], data_split: List[Tuple[list]], root_fpath:
 
     mean_auroc = np.mean(aurocs)
     tune.report(auroc=mean_auroc) 
-    
-    # TODO: Remove. Not used.
-    #tune.report(auroc=np.mean(graph_aurocs))
 
+
+# we can add a warning if this is violated: "n. GPUs <= n. CPUs"
 def hyperparameter_optimization(data_split: List[Tuple[list]], root_fpath: str, metadata_files: Any, input_data_dimension: int,  
         model_type: Any, model_hyperparameters: Dict[str, Any], set_model: bool = False, 
         tensorboard_dir: str = None, ray_run_config_kwargs: dict = {'verbose': 1},
