@@ -29,6 +29,7 @@ class GCNStandardSupervised(BaseGraphModel):
         - Pooling Layer (default: global_mean)
         - Linear Layers (`out_channels`)
     """
+# The fact that these are not typed or checked might be confusing. might even be worth while to put in docstring. Also in channels and out channels I assume need to be of same length, might also be checked and documented.
  
     def __init__(self, 
             in_channel: int,
@@ -131,7 +132,6 @@ class GCNStandardSupervised(BaseGraphModel):
         """See base.py for specification
         """
         # Pools over all cell embeddings
-        # TODO: Input currently after cell embedding. Should cell embedding be integrated into the function?
         return self.pooler(x, batch)
 
     @staticmethod
