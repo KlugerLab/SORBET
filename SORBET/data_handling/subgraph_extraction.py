@@ -12,9 +12,7 @@ def subgraph_extraction(tissue_graph: OmicsGraph, extraction_method: str, extrac
     Options for subgraph extaction include:
         "microenvironment": _microenvironment_subgraph_extraction,
         "arbitrary": _arbitrary_subgraph_extraction,
-        "heat_diffusion": _heat_diffusion_subgraph_extraction
-    Heat diffusion extraction is not implemented.
-
+        
     Args:
         tissue_graph: OmicsGraph object, which the subgraph extraction algorithm will be applied on
         extraction_method: chosen method. Options defined above.
@@ -27,7 +25,7 @@ def subgraph_extraction(tissue_graph: OmicsGraph, extraction_method: str, extrac
     return subgraph_extraction_methods[extraction_method](tissue_graph, **extraction_args)
 
 def _microenvironment_subgraph_extraction(tissue_graph: OmicsGraph, marker: str, k: int, minimum_size: int) -> List[OmicsGraph]:
-    """Subgraph extraction algorithm prioritzing by expression of a chosen marker.
+    """Subgraph extraction algorithm prioritzing by expression of a chosen marker. (See Algorithm X in manuscript)
 
     Args:
         tissue_graph: input OmicsGraph object
@@ -65,13 +63,6 @@ def _microenvironment_subgraph_extraction(tissue_graph: OmicsGraph, marker: str,
         m = Q.pop()
     
     return subgraphs
-
-def _heat_diffusion_subgraph_extraction(tissue_graph: OmicsGraph, marker: str, k: int, minimum_size: int):
-    """Subgraph extraction via heat diffusion-like process. Not implemented. 
-    """
-    # TODO: Extract subgraphs using heat-diffusion like graph cover
-
-    return [tissue_graph]
 
 def _arbitrary_subgraph_extraction(tissue_graph: OmicsGraph, marker: str, k: int, minimum_size: int):
     """Subgraph extraction via an arbitrary selection of (minimally-overlapping) subgraphs.
@@ -115,5 +106,4 @@ def _arbitrary_subgraph_extraction(tissue_graph: OmicsGraph, marker: str, k: int
 subgraph_extraction_methods = {
         "microenvironment": _microenvironment_subgraph_extraction,
         "arbitrary": _arbitrary_subgraph_extraction,
-        "heat_diffusion": _heat_diffusion_subgraph_extraction
         }
