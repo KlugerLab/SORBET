@@ -39,7 +39,7 @@ from torch_geometric.data import Data
 
 from .graph_model import OmicsGraph, load_omicsgraph, dump_omicsgraph
 from .subgraph_extraction import subgraph_extraction
-
+# NOT CRITICAL: its a bit weird that subgraph_extraction is not implemented here, the reason that I say this is that it is not clear to the user what are the options that he cann give in the algorithm for arguments like subgraph_extraction_algorithm even if he looks for the docstring of the function 
 def create_subgraphs(complete_graphs_dirpath: str, output_dirpath: str, subgraph_extraction_algorithm: str, subgraph_extraction_algorithm_kwargs: dict, 
         mapping_fname: str = "py_subgraph_mapping.csv", subgraph_dirname: str = "graphs_py", subgraph_extraction_type: str = "arbitrary") -> None:
     """Converts OmicsGraph objects into subgraphs using a specified subgraph extraction algorithm.
@@ -65,24 +65,30 @@ def create_subgraphs(complete_graphs_dirpath: str, output_dirpath: str, subgraph
     if not os.path.exists(pygraphs_output_dirpath):
         os.makedirs(pygraphs_output_dirpath)
 
-    for ifile in os.listdir(complete_graphs_dirpath):
-        fpath = os.path.join(complete_graphs_dirpath, ifile)
-        graph = load_omicsgraph(fpath)
+    files = os.listdir(complete_graphs_dirpath)
+    if not files:
+        print(f'Warning: No graph files found in directory: {complete_graphs_dirpath}')
+    else:
+        for ifile in files:
+            fpath = os.path.join(complete_graphs_dirpath, ifile)
+            graph = load_omicsgraph(fpath)
+    
+            graph_id = os.path.splitext(ifile)[0]
+            subgraph_files = []
+    
+            subgraphs = subgraph_extraction(
+                graph,
+                subgraph_extraction_algorithm,
+                subgraph_extraction_algorithm_kwargs
+            )
+            for sg_idx, sg in enumerate(subgraphs):
+                fname = f'{graph_id}_sg_{sg_idx}.p'
+                ofpath = os.path.join(pygraphs_output_dirpath, fname)
+                dump_omicsgraph(sg, ofpath)
+                subgraph_files.append(os.path.join(subgraph_dirname, fname))
+    
+            subgraph_file_mapping.append([graph_id, fpath, *subgraph_files])
 
-        graph_id = os.path.splitext(ifile)[0]
-        
-        subgraph_files = list()
-        
-        subgraphs = subgraph_extraction(graph, subgraph_extraction_algorithm, subgraph_extraction_algorithm_kwargs)
-        for sg_idx, sg in enumerate(subgraphs):
-            fname = f'{graph_id}_sg_{sg_idx}.p'
-            ofpath = os.path.join(pygraphs_output_dirpath, fname)
-            dump_omicsgraph(sg, ofpath)
-    
-            subgraph_files.append(os.path.join(subgraph_dirname, fname))
-            
-        subgraph_file_mapping.append([graph_id, fpath, *subgraph_files])
-    
     mapping_fpath = os.path.join(output_dirpath, mapping_fname)
     with open(mapping_fpath, 'w+') as f:
         writer = csv.writer(f, delimiter=',')
