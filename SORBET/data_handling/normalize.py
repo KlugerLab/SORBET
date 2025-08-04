@@ -190,6 +190,7 @@ def _normalize_to_range(data: np.ndarray, normalize_method: str):
     mi, ma = np.min(data, axis=0), np.max(data, axis=0)
     return (data - mi) / (ma - mi)
 
+# This is a bit confusing as global variables like here  - at least from I am used to - are usually CAPITALS.
 normalization_method_fns = {
         'total_count': _normalize_by_total_count,
         'log_normalize': _normalize_by_log,
