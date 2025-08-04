@@ -1,7 +1,6 @@
 """An abstract class defining necessary model components for working
 with the defined code.
 """
-#from typing import *
 import torch
 from abc import abstractmethod
 
@@ -28,6 +27,7 @@ class BaseGraphModel(torch.nn.Module):
         """
         raise NotImplementedError
 
+    # " Helpful for predictions without attached gradients." might be confusing
     @abstractmethod
     def predict(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         """Function to predict outputs for a given input. 
@@ -77,7 +77,8 @@ class BaseGraphModel(torch.nn.Module):
         """
 
         pass
-    
+
+    # why are these in pass and not "raise NotImplementedError". Are they optional for downstream task? Do they have a default?
     @abstractmethod
     def get_subgraph_embedding(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         """Function to extract the subgraph embeddings of a series of input graphs.
