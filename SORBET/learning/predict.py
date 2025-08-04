@@ -67,6 +67,7 @@ def predict_subgraphs(input_dirpath: str, root_fpath: str, metadata_files: str, 
     
     return combined_data
 
+# Here the docstring is a bit confusing. Is this funcion ment to predict for a specific subgraph or for a specific split? What is exactly then the difference from previous one ? cross validation? The point of running a second time is also not that clear.
 def export_split_subgraph_predictions(input_dirpath: str, split_idx: int,
         labels: np.ndarray, predictions: np.ndarray, test_dataset: TorchOmicsDataset,
         output_fname: str = _output_combined_subgraph_fname):
@@ -99,6 +100,7 @@ def export_split_subgraph_predictions(input_dirpath: str, split_idx: int,
         if write_header: writer.writerow(header)
         writer.writerows(combined_data)
 
+# not clear why is there a output file if you are already loading the predictions (which are the outputs)
 def load_subgraph_predictions(input_dirpath: str, subgraph_fname: str = _output_combined_subgraph_fname
         ) -> List[Tuple[int, float, str, str, str]]:
     """Load previously computed subgraph predictions saved at a chosen location
@@ -146,6 +148,7 @@ def _process_subgraph_ids(fpaths, sg_pattern: str = "_sg_(\d+)") -> List[Tuple[s
 
     return subgraph_descriptors 
 
+# Again not a fan of the lowercase global var...  
 _strategies = {
             "median": np.median,
             "mean": np.mean,
@@ -209,6 +212,7 @@ def predict_graphs(input_dirpath: str, combination_strategy: str,
 
     return combined_data 
 
+# again not clear why you need an output file
 def load_graph_predictions(input_dirpath: str, tissue_fname: str = _output_combined_graph_fname) -> List[Tuple[int, float, str]]:
     """Load previously computed graph predictions
 
