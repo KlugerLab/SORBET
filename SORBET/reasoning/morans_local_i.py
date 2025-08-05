@@ -7,6 +7,8 @@ import pandas as pd
 
 from tqdm import tqdm as tqdm
 
+# GENERAL COMMENT : in practice we do not include this in the paper. Therefore we should maybe not retain it. If we do we need to explicitly mention this. 
+# The argument shell_size here is not clear. Also what is the equation for calculation the weight matrix?
 def calculate_weight_matrices(graph_lens: Dict[str, Dict[int, Dict[int, int]]], shell_size: int = 3, progressbar: bool = False) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
     """Computes the weight matrix w_{ij} between all pairs of nodes in graphs.
 
@@ -39,6 +41,7 @@ def _estimate_pvalues(nums, dist):
     estimator_le = lambda ni: sum(1 for di in dist if di <= ni) / len(dist)
     return list(zip(map(estimator_gr, nums), map(estimator_le, nums)))
 
+#It is clear that a general info of how this procedure is done and how we use moram index here is missing. It can be maybe in the README
 def calculate_local_morans_i(marker: str, expression_data: pd.DataFrame, weight_matrices: Dict[str, np.ndarray], 
         nperms=10, progressbar=False) -> Tuple[str, List[Tuple[Any]]]:
     """Computes the local Moran's i for a single instance of a marker.
@@ -110,6 +113,7 @@ def parallelize_moran_i_local(markers_list: List[str], expression_data: pd.DataF
     
     partial_moran_i = partial(calculate_local_morans_i, expression_data = expression_data, weight_matrices = weight_matrices, nperms = nperms, progressbar = False)
 
+    # Note : why 16 necessarly ? should probably be a parameter of the function
     with mp.Pool(16) as p:
         for marker, statistics in tqdm(p.imap_unordered(partial_moran_i, markers_list), total=len(markers_list), disable=(not progressbar), desc="Marker Computation"):
             yield marker, statistics
