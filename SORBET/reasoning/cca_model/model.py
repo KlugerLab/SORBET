@@ -40,7 +40,7 @@ class L0SparseCCA:
             priors: priors over the computed canonical vectors. Estimated using CCA or PCA (see the fit function) 
             sigma: width of probability model used in reparametrization trick  
             r: sparsity fraction parameter applied to priors  
-            optimizer: choice of optimizer used to train moodels
+            optimizer: choice of optimizer used to train models
             display: display training progressbar 
             correlation_threshold: minimum threshold for correlation to reach
             learning_rate: step size for each training step
