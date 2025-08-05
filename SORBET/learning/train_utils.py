@@ -93,6 +93,7 @@ def repeated_stratified_kfold_splits(labels_or_fpath: Any, k: int, r: int, inclu
 
             yield [*_positives, *_negatives], test_set
 
+# The docstrings here are quite hard to understand ( maybe put an example )
 def make_inner_kfold_split(data_split: List[Tuple[list]], excluded_index: int) -> Tuple[List[str], List[str]]:
     """Helper function to re-split a k-fold split to nest a k-fold split 
 
@@ -188,6 +189,8 @@ def _load_samples_split(labels_fpath) -> Tuple[list, list]:
     
     return positives, negatives
 
+# same with constants also I feel like these should be at the top of the file (if used by multiple files might even be in the init or utils or a designated file
+# also maybe I am wrong but isn't the extention counts as what after the . meaning ".p" and this would count as a suffix (maybe even make sure that the ext is .p)
 _model_ext = '_model_statedict.pt'
 _kwargs_ext = '_model_init.p'
 def save_model(model, kwargs: Dict[str, Any], fpath_rt: str, model_ext: str = _model_ext, kwargs_ext: str = _kwargs_ext):
@@ -236,6 +239,6 @@ def load_model(model_type, fpath_rt: str, model_ext: str = _model_ext, kwargs_ex
     state_dict = torch.load(model_fpath)
     model.load_state_dict(state_dict)
     
-    model.eval() # TODO: Is this necessary? Doesn't hurt, but I think this is overthinking the function.
+    model.eval()
 
     return model
