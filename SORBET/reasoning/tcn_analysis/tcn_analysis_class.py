@@ -53,13 +53,14 @@ class TCNAnalysis:
             Indexing of cell types.
 
         Returns:
-        List[TCN]
+        tcns: List[TCN]
             A list of TCN objects.
 
         Note: The TCN here is calculated for each vertex in the whole graph and not only for vertices in subgraphs.
         """
         tcns = []
         for (run_id, fov_id), _ in cell_type_mapping.items():
+            # Question: can we assume this graph_fpath? If not should change to a parameter with a default value 
             graph_fpath = f'data/CosMx/graphs_py/complete/run_{run_id}_fov_{fov_id}.p'
             try:
                 graph = data_handling.load_omicsgraph(graph_fpath)
@@ -100,6 +101,26 @@ class TCNAnalysis:
                                  vertices: np.ndarray,
                                  neighberhood_size: int = 3,
                                  add_markers: bool = False) -> Tuple[List['TCN'], Dict[Tuple[int, int], Dict[int, float]], Dict[Tuple[int, int], Dict[int, np.ndarray]]]:
+        """
+        Calculates and returns a list of TCN objects.
+
+        Parameters:
+        normed : bool
+            Whether to normalize the data.
+        cell_type_mapping : Dict[Tuple[int, int], Dict[int, str]]
+            Mapping of cell types.
+        cell_type_indexing : Dict[str, int]
+            Indexing of cell types.
+
+        Returns:
+        tcn: List[TCN]
+            A list of TCN objects.
+        scores_per_fov: Dict[Tuple[int, int], Dict[int, float]]
+        
+        cell_profiles: Dict[Tuple[int, int], Dict[int, np.ndarray]]
+
+        Note: The TCN here is calculated for each vertex in the whole graph and not only for vertices in subgraphs.
+        """
         tcns = []
         scores_per_fov = defaultdict(dict)
         cell_profiles = defaultdict(lambda: defaultdict(lambda: None))
