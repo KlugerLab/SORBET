@@ -26,9 +26,10 @@ class CCAData:
     out_array: np.ndarray
     indexing: CCADataIndexing
 
+#Note: what are the Acronyms of CCAD
 def preprocess_graph_structured_data(input_data_dir: str, output_data: np.ndarray, output_labels: list, output_vertex_indices: list, 
         nhops: Optional[int] = 1, exact_hops: Optional[bool] = True) -> CCAData:
-    """Creates a CCAData objet from input data corresponding to graph-aware. 
+    """Creates a CCAData object from input data corresponding to graph-aware CCA. 
     Pairs all input data values with the appropriate graph-structured pairings.
 
     Args:
