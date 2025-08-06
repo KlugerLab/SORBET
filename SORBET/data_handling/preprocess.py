@@ -40,6 +40,7 @@ from torch_geometric.data import Data
 from .graph_model import OmicsGraph, load_omicsgraph, dump_omicsgraph
 from .subgraph_extraction import subgraph_extraction
 
+# NOTE: create_subgraphs primarily processes data. The algorithms for identifying subgraphs exsits in subgraph_extraction.py. 
 def create_subgraphs(complete_graphs_dirpath: str, output_dirpath: str, subgraph_extraction_algorithm: str, subgraph_extraction_algorithm_kwargs: dict, 
         mapping_fname: str = "py_subgraph_mapping.csv", subgraph_dirname: str = "graphs_py", subgraph_extraction_type: str = "arbitrary") -> None:
     """Converts OmicsGraph objects into subgraphs using a specified subgraph extraction algorithm.
@@ -73,7 +74,10 @@ def create_subgraphs(complete_graphs_dirpath: str, output_dirpath: str, subgraph
         
         subgraph_files = list()
         
-        subgraphs = subgraph_extraction(graph, subgraph_extraction_algorithm, subgraph_extraction_algorithm_kwargs)
+        subgraphs = subgraph_extraction(
+                graph,                                                                  # Graph to extract subgraphs from 
+                subgraph_extraction_algorithm, subgraph_extraction_algorithm_kwargs     # Passed subgraph extraction options. See subgraph_extraction.py 
+        )
         for sg_idx, sg in enumerate(subgraphs):
             fname = f'{graph_id}_sg_{sg_idx}.p'
             ofpath = os.path.join(pygraphs_output_dirpath, fname)
