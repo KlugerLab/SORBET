@@ -25,7 +25,7 @@ def subgraph_extraction(tissue_graph: OmicsGraph, extraction_method: str, extrac
     return subgraph_extraction_methods[extraction_method](tissue_graph, **extraction_args)
 
 def _microenvironment_subgraph_extraction(tissue_graph: OmicsGraph, marker: str, k: int, minimum_size: int) -> List[OmicsGraph]:
-    """Subgraph extraction algorithm prioritzing by expression of a chosen marker. (See Algorithm X in manuscript)
+    """Subgraph extraction algorithm prioritzing by expression of a chosen marker. (See Algorithm 1 in manuscript)
 
     Args:
         tissue_graph: input OmicsGraph object
@@ -102,7 +102,7 @@ def _arbitrary_subgraph_extraction(tissue_graph: OmicsGraph, marker: str, k: int
 
     return subgraphs
 
-
+# TODO: Use consistent style for global variables (convert to CAPITALS). See also normalize.py 
 subgraph_extraction_methods = {
         "microenvironment": _microenvironment_subgraph_extraction,
         "arbitrary": _arbitrary_subgraph_extraction,
