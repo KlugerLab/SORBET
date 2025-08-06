@@ -4,6 +4,8 @@ SORBET is a geometric deep-learning framework that utilizes graph-convolutional 
 
 The model is broken into a `Learning` phase, where tissues are classified, and a `Reasoning` phase, where the inferred models are analyzed for biological insight. The code shares that structure, with sub-modules for `learning` and `reasoning`. In addition, the code includes a sub-module for `data_handling`.  
 
+![overview_figure](assets/Overview.png)
+
 ## Requirements and Installation
 
 SORBET has been tested on Linux 20.04.5 system with CUDA 11.7. Code was developed in Python (v3.10). 
