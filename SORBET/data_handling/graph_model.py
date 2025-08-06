@@ -115,7 +115,7 @@ class OmicsGraph:
 
         return list(neighbors)
     
-    def make_subgraph(self, vertex_lst: list) -> OmicsGraph:
+    def make_subgraph(self, vertex_lst: list) -> 'OmicsGraph':
         """Makes a subgraph from the subset of vertices included 
 
         Args:

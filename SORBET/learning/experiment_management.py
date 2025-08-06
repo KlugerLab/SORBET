@@ -1,7 +1,7 @@
 import os
 import csv, pickle
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 

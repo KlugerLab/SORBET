@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Union, Any, Optional
+from typing import List, Tuple, Dict, Union, Any, Optional
 from dataclasses import dataclass
 from functools import partial
 from tqdm import tqdm as tqdm

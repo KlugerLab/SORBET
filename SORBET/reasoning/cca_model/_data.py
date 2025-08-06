@@ -1,5 +1,6 @@
 """Data object for working with CCA datasets. Requires two datasets with matching second dimensions. 
 """
+from typing import List
 import numpy as np
 from torch.utils.data import Dataset
 

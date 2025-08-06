@@ -143,7 +143,7 @@ def train_model(
     return model, (preds, labs), (test_auroc, test_avg_prec), train_loss, val_loss 
 
 def _train_step(model, dataloader: DataLoader, optimizer: torch.optim, 
-        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"), epoch: int, logger=None) -> np.ndarray:
+        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"), epoch: int = -1, logger=None) -> np.ndarray:
     """Computes a single training epoch for the model
     A sub-routine used by train_model.
 
@@ -219,7 +219,7 @@ def _test_step(model, dataloader: DataLoader,
     return predictions, labels
 
 def _validate_step(model, dataloader: DataLoader, 
-        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),, epoch: int, logger=None) -> Tuple[np.ndarray, np.ndarray, float]:
+        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"), epoch: int = -1, logger=None) -> Tuple[np.ndarray, np.ndarray, float]:
     """Computes a single validation epoch for the model
     A sub-routine used by train_model.
 

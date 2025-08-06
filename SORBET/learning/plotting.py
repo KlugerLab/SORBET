@@ -1,6 +1,6 @@
 """Helper plotting functions for results. 
 """
-from typing import Union, List, Optional
+from typing import Union, List, Tuple, Optional
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -24,7 +24,7 @@ class PlotStyle:
     external: Union[str, List[int]] = "#00CD6C"
     # GeoDataVis Colour Palette, accessed at https://www.molecularecologist.com/2020/04/23/simple-tools-for-mastering-color-in-scientific-figures/
 
-def plot_combined_metrics(computed_data: List[str, List[float], List[int]], plot_roc: Optional[bool] = True, plot_pr: Optional[bool] = True,
+def plot_combined_metrics(computed_data: List[Tuple[str, List[float], List[int]]], plot_roc: Optional[bool] = True, plot_pr: Optional[bool] = True,
         figsize: Optional[List[int]] = None) -> plt.figure:
     """Plots the model performance for each of the passed in data attributes.
 

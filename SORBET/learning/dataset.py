@@ -16,7 +16,7 @@ class TorchOmicsDataset(Dataset):
         _processed_files: List of processed files. Used in conjunction w/ _processed_dir.
 
     """
-    def __init__(self, root: str, subgraph_metadata: SubgraphMetadata, split: List[str] = None, transform=None, pre_transform=None, pre_filter=None):
+    def __init__(self, root: str, subgraph_metadata: 'SubgraphMetadata', split: List[str] = None, transform=None, pre_transform=None, pre_filter=None):
         """Initializes a TorchOmicsDataset.
 
         Largely follows the standard format (similar to tutorials) prescribed by the torch_geometric package.

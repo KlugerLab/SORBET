@@ -1,6 +1,6 @@
 """Helper functions for hyperparameter_optimization.py
 """
-from typing import List, Dict, Any, Union, Optional
+from typing import List, Tuple, Dict, Any, Union, Optional
 from functools import partial
 
 from optuna.trial import Trial
