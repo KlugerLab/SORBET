@@ -60,8 +60,6 @@ def objective(config: Dict[str, any], data_split: List[Tuple[list]], root_fpath:
     mean_auroc = np.mean(aurocs)
     tune.report(auroc=mean_auroc) 
 
-
-# we can add a warning if this is violated: "n. GPUs <= n. CPUs"
 def hyperparameter_optimization(data_split: List[Tuple[list]], root_fpath: str, metadata_files: Any, input_data_dimension: int,  
         model_type: Any, model_hyperparameters: Dict[str, Any], set_model: bool = False, 
         tensorboard_dir: str = None, ray_run_config_kwargs: dict = {'verbose': 1},
@@ -97,6 +95,9 @@ def hyperparameter_optimization(data_split: List[Tuple[list]], root_fpath: str, 
         n_concurrent = min(n_gpus, n_cpus)
         per_trial = {'gpu': n_gpus // n_concurrent, 'cpu': n_cpus // n_concurrent}
     
+    if n_gpus < n_cpus:
+        import warnings; warning.warn("Passed resource indicate fewere CPUs than GPUs. This will degrade performance.")
+
     # Initialize Ray instance:
     ray.init()
 

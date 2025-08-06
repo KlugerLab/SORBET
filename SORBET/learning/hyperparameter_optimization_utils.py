@@ -40,12 +40,13 @@ def get_model_and_training_specifications(config: Dict[str, any], model_type: An
     
     return params, model_structure
 
-# NOT CRITICAL: what happens when you want to test two values? (in terms of space). I assume you can set in the type but not clear from doc
 def _parse_hyperparameter_type(trial: Trial, space: List[Any], hparam_name: str, hparam_type: Any, hparam_log_space: bool): 
     """Parses model specification and suggests the appropriate values for a given trial.
     
     If the size of the search space, <space>, is two, assumes that the values represent bounds on the range.
     Otherwise, treats <space> as a categorical list to suggest from.
+    
+    TODO: Add option to pass list of length two for categorical sampling. Not currently supported.
 
     Args:
         trial: an Optuna Trial object parameters are sugggested to

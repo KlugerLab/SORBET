@@ -156,10 +156,12 @@ def _match_config_names(param_name: str, dataframe_cols: List[str], serializable
         param_tune_name = next(filter(condition, dataframe_cols)) 
         return param_tune_name
 
-#NOT CRITICAL: what happens if fails? can you set this manually ? 
 def _is_logscale(data: np.ndarray, log_thr: float = 2):
     """Helper function to understand if hyperparameter has a log-like structure.
     Rough estimate; not always correct.
+
+    NOTE: If this fails, the appropriate axis can still be set manually (e.g., ax.set_xscale('log') for the relevant axis).
+    Scale may be inappropriate otheriwse. 
 
     Args:
         data: a numpy array with the sampled hyperparameters

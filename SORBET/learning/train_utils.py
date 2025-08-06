@@ -93,9 +93,17 @@ def repeated_stratified_kfold_splits(labels_or_fpath: Any, k: int, r: int, inclu
 
             yield [*_positives, *_negatives], test_set
 
-# The docstrings here are quite hard to understand ( maybe put an example )
 def make_inner_kfold_split(data_split: List[Tuple[list]], excluded_index: int) -> Tuple[List[str], List[str]]:
     """Helper function to re-split a k-fold split to nest a k-fold split 
+    
+    This function is helpful for nested cross validation. For example, 
+    Consider a five fold cross validation with test splits, {0,1,2,3,4}, where each index corresponds to a set of graph IDs.
+
+    stratified_kfold_split creates a record like: 
+        [[[0,1,2], [3], [4]], [[4,0,1],[2],[3]],...]
+    make_inner_kfold_split with, for example, excluded_index = 4, creates a data split like:
+        [[[0,1,2],[3],[4]], [[0,1,3],[2],[4]], [[0,2,3],[1],[4]], [[1,2,3],[0],[4]]] 
+    (All possible sub-splits of the (k-1) folds not being tested).    
 
     Args:
         data_split: the outer k-fold split to re-split along inner splits
@@ -189,8 +197,8 @@ def _load_samples_split(labels_fpath) -> Tuple[list, list]:
     
     return positives, negatives
 
-# same with constants also I feel like these should be at the top of the file (if used by multiple files might even be in the init or utils or a designated file
-# also maybe I am wrong but isn't the extention counts as what after the . meaning ".p" and this would count as a suffix (maybe even make sure that the ext is .p)
+# NOTE: Not declared at the top of file to discourage changing the filepaths. These files are appended to an input function
+# (e.g., fpath_rt) to create two files (e.g., fpath_rt + _model_ext is the saved model state; fpath_rt + _kwargs_ext the initialization argument)
 _model_ext = '_model_statedict.pt'
 _kwargs_ext = '_model_init.p'
 def save_model(model, kwargs: Dict[str, Any], fpath_rt: str, model_ext: str = _model_ext, kwargs_ext: str = _kwargs_ext):
