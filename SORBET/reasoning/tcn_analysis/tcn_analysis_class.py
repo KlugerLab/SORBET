@@ -1544,7 +1544,7 @@ class TCNAnalysis:
 
     @staticmethod
     def get_distinct_color(existing_colors):
-            """
+        """
         Selects a new color from matplotlib tab20 not in existing_colors.
 
         Args:
@@ -1569,7 +1569,7 @@ class TCNAnalysis:
 
     @staticmethod
     def plot_network(pathways, unique_types, combination_name, type_colors=None, ax=None):
-    """
+        """
         Draws a multi‐graph of cell‐type interactions on concentric hop circles.
 
         Args:
@@ -1672,7 +1672,7 @@ class TCNAnalysis:
         
     @staticmethod
     def prepare_and_plot_network(categorized_markers, combination, combination_name="", group="Responders", csv_path=None, typed_colors=None):
-    """
+        """
         Produces side‐by‐side network plots for responders vs. non‐responders.
 
         Args:
@@ -1752,7 +1752,7 @@ class TCNAnalysis:
     def plot_global_cell_type_significance(marker_results: Dict, 
                                         significance_threshold: float = 0.05, 
                                         display_threshold: float = 0.5):
-    """
+        """
         Aggregates across combinations and displays a heatmap of cell-type significance.
 
         Args:
@@ -2683,7 +2683,7 @@ class TCNAnalysis:
         num_markers: int = 960,
         idws_thresh: float = 0.5
     ) -> Dict[str, Dict[str, Dict[str, List[float]]]]:
-            """
+        """
         Gathers per-cell expression lists for both original labels and IDWS classes per cell-type.
 
         Args:
