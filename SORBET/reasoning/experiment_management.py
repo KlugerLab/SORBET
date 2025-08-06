@@ -23,6 +23,7 @@ _plots_dname = "plots"
 _cell_embeddings_fname = "cell_embeddings.npz"
 _sg_embeddings_fname = "sg_embeddings.npz"
 
+# TODO: Add description of LearningRecord outputs into the docstring (either above or in this function). 
 def create_data_split_record(output_directory: str) -> LearningRecord:
     """Creates a new directory with a pre-defined structure for saving SORBET experiments on a specific data split.
 

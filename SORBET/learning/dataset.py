@@ -113,7 +113,6 @@ def make_subgraph_metadata(processed_dirpath: str, py_mapping_fname: str = "py_s
     
     return SubgraphMetadata(os.path.abspath(processed_dirpath), py_map_fpath, torch_map_fpath)
 
-# TODO: Should probably flip included_graphs to the last argument 
 def _load_filtered_graphs(included_graphs: Union[List[str], None], datadir: str, subgraph_mapping_fpath: str, torchgraph_mapping_fpath: str) -> List[str]:
     """Returns a list of filepaths to torch files representing subgraphs. 
     

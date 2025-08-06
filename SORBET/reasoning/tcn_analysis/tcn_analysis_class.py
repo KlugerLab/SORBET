@@ -29,37 +29,25 @@ from matplotlib.patches import FancyArrowPatch
 class TCNAnalysis:
     """
     A class to manage the overall TCN analysis process.
-
-    Methods:
-    calculate_TCNs():
-        Calculates and returns a list of TCN objects.
-    compute_hierarchical_clustering():
-        Computes hierarchical clustering and returns TCN objects for each cluster.
-    filter_significant_clusters():
-        Filters significant clusters using IDWS scores and returns them as TCN objects.
     """
-
     @staticmethod
     def calculate_TCNs(cell_type_mapping: Dict[Tuple[int, int], Dict[int, str]], cell_type_indexing: Dict[str, int]) -> List[TCN]:
         """
-        Calculates and returns a list of TCN objects.
+        Calculates TCN arrays for every vertex in the omics graph per run and field of view.
 
-        Parameters:
-        normed : bool
-            Whether to normalize the data.
-        cell_type_mapping : Dict[Tuple[int, int], Dict[int, str]]
-            Mapping of cell types.
-        cell_type_indexing : Dict[str, int]
-            Indexing of cell types.
+        Args:
+            cell_type_mapping: Mapping from (run_id, fov_id) to vertex->cell type name.
+            cell_type_indexing: Mapping from cell type name to column index in TCN arrays.
 
         Returns:
-        List[TCN]
-            A list of TCN objects.
+            List[TCN]: A list of TCN objects, one per vertex per FOV.
 
-        Note: The TCN here is calculated for each vertex in the whole graph and not only for vertices in subgraphs.
+        Notes:
+            If a graph file is missing, that (run_id, fov_id) pair is skipped.
         """
         tcns = []
         for (run_id, fov_id), _ in cell_type_mapping.items():
+            # Question: can we assume this graph_fpath? If not should change to a parameter with a default value 
             graph_fpath = f'data/CosMx/graphs_py/complete/run_{run_id}_fov_{fov_id}.p'
             try:
                 graph = data_handling.load_omicsgraph(graph_fpath)
@@ -100,6 +88,26 @@ class TCNAnalysis:
                                  vertices: np.ndarray,
                                  neighberhood_size: int = 3,
                                  add_markers: bool = False) -> Tuple[List['TCN'], Dict[Tuple[int, int], Dict[int, float]], Dict[Tuple[int, int], Dict[int, np.ndarray]]]:
+        """
+        Calculates TCN arrays and IDWS scores for vertices in modeled subgraphs.
+
+        Args:
+            cell_type_mapping: Mapping from (run_id, fov_id) to vertex->cell type name.
+            cell_type_indexing: Mapping from cell type name to column index.
+            subgraphs: Array of subgraph identifiers aligned with `vertices`.
+            scores: Array of IDWS scores aligned with `vertices`.
+            vertices: Array of vertex identifiers aligned with `subgraphs`.
+            neighberhood_size: Number of hops to include (default 3).
+            add_markers: If True, include marker-level TCN arrays.
+
+        Returns:
+            tcns: List[TCN] — TCN objects with optional marker arrays.
+            scores_per_fov: Dict[(run_id, fov_id), Dict[cell_id, float]] — IDWS scores per cell.
+            cell_profiles: Dict[(run_id, fov_id), Dict[cell_id, np.ndarray]] — marker profiles per cell.
+
+        Notes:
+            Each vertex is processed only once per FOV; missing graph files are skipped.
+        """
         tcns = []
         scores_per_fov = defaultdict(dict)
         cell_profiles = defaultdict(lambda: defaultdict(lambda: None))
@@ -170,25 +178,23 @@ class TCNAnalysis:
 
     def compute_hierarchical_clustering(tcns, method='average', cell_type_group_to_remove=None, optimal_ordering=False):
         """
-        Computes hierarchical clustering and returns TCN objects for each cluster,
-        optimizing the number of clusters based on a composite score of Silhouette and Homogeneity.
+        Performs hierarchical clustering on flattened TCN representations and selects the optimal number of clusters.
 
-        Parameters:
-        tcns : List[TCN]
-            The list of TCN objects.
-        method : str, optional
-            The clustering method, by default 'average'.
-        cell_type_group_to_remove : None | List[str], optional
-            The cell type group to remove, by default None.
-        optimal_ordering : bool, optional
-            Whether to use optimal ordering, by default False.
+        Args:
+            tcns: List[TCN] — the list of TCN objects to cluster.
+            method: str — linkage method for clustering (default 'average').
+            cell_type_group_to_remove: List of cell type names to exclude before clustering.
+            optimal_ordering: bool — enable optimal leaf ordering if True.
 
         Returns:
-        List[TCN]
-            A list of TCN objects for each cluster.
-        np.ndarray
-            An array of cluster labels.
+            clusters: List[TCN] — one summed TCN per cluster.
+            cluster_labels: np.ndarray — cluster label per input TCN.
+
+        Raises:
+            ValueError: if `tcns` is empty.
         """
+        if not tcns:
+            raise ValueError("Cannot cluster empty TCN list.")
         # Prepare the data array for clustering
         if cell_type_group_to_remove is not None:
             cell_types_to_keep_indices = [i for i, ct in enumerate(tcns[0].cell_type_indexing) if ct not in cell_type_group_to_remove]
@@ -238,31 +244,20 @@ class TCNAnalysis:
     @staticmethod
     def filter_significant_clusters(cluster_tcns: List[TCN], idws_scores: Dict[Tuple[int, int], Dict[int, float]], min_cells: int = 500, min_patients: int = 2, significance_level: float = 0.05, use_original_labels: bool = False) -> Tuple[List[TCN], List[float], List[int]]:
         """
-        Filters significant clusters using IDWS scores and returns them as TCN objects.
+        Filters clusters by comparing their IDWS score distributions against all others using the KS test.
 
-        Parameters:
-        tcns : List[TCN]
-            The list of TCN objects for each cluster.
-        idws_scores : Dict[int, float]
-            The IDWS scores. A dictionary with keys (run_id, fov_id) and values a dictionary with keys cell_id and values IDWS score.
-        min_cells : int, optional
-            The minimum number of cells, by default 500.
-        min_patients : int, optional
-            The minimum number of patients, by default 2.
-        significance_level : float, optional
-            The significance level, by default 0.05.
-        use_original_labels : bool, optional
-            Whether to use original labels instead of IDWS scores, by default False.
-
-        Note: The statistical tests are KS tests to compare the IDWS score distributions of TCNs in each cluster against those in all other clusters
+        Args:
+            cluster_tcns: List[TCN] — one TCN per cluster.
+            idws_scores: Mapping from (run_id,fov_id) to cell->score.
+            min_cells: Minimum center cells in a cluster (default 500).
+            min_patients: Minimum unique patients (default 2).
+            significance_level: p-value threshold (default 0.05).
+            use_original_labels: If True, compare original labels instead.
 
         Returns:
-        List[TCN]
-            A list of significant TCN objects.
-        List[float]
-            A list of p-values for each cluster.
-        List[int]
-            A list of indices of significant clusters.
+            significant_tcns: List[TCN] — clusters passing all filters.
+            p_values: List[float] — KS test p-values per cluster.
+            indices: List[int] — indices of significant clusters.
         """
         if use_original_labels:
             clusters_scores_dict = {c_id: cluster.label for c_id, cluster in enumerate(cluster_tcns)}
@@ -283,21 +278,18 @@ class TCNAnalysis:
     @staticmethod
     def compute_original_vs_idws_p_values(cluster_mask: np.ndarray, labels: np.ndarray, thresholded_idws: np.ndarray, significant_clusters_inds: None | List[int] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Computes p-values for comparing the original labels and thresholded IDWS scores.
+        Computes Fisher exact‐test p-values comparing original labels vs. IDWS thresholds per cluster.
 
-        Parameters:
-        cluster_mask : np.ndarray
-            The cluster mask.
-        labels : np.ndarray
-            The original labels.
-        thresholded_idws : np.ndarray
-            The thresholded IDWS scores.
-        significant_clusters_inds : None | List[int], optional
-            The indices of significant clusters, by default None.
+        Args:
+            cluster_mask: 1D array of cluster assignments per cell.
+            labels: 1D array of original binary labels per cell.
+            thresholded_idws: 1D array of −1/0/+1 per cell from thresholded IDWS scores.
+            significant_clusters_inds: Optional list of cluster IDs to include; if None, use all.
 
-        Returns:    
-        Tuple[np.ndarray, np.ndarray]
-            A tuple of p-values for original labels and thresholded IDWS scores.
+        Returns:
+            Tuple[np.ndarray, np.ndarray]:
+                - p_values_labels: p-values comparing original labels inside vs. outside each cluster.
+                - p_values_idws: p-values comparing IDWS classes inside vs. outside.
         """
         if significant_clusters_inds is None:
             unique_clusters = np.unique(cluster_mask)
@@ -329,6 +321,17 @@ class TCNAnalysis:
 
     @staticmethod
     def plot_p_values_comparison(p_values_labels: np.ndarray, p_values_idws: np.ndarray, significant_cluster_numbers: List[int]) -> None:
+        """
+        Plots a scatter of original‐vs‐IDWS p-values for significant clusters.
+
+        Args:
+            p_values_labels: Array of p-values from original-label tests.
+            p_values_idws: Array of p-values from IDWS-based tests.
+            significant_cluster_numbers: List of cluster IDs to annotate.
+
+        Returns:
+            None — displays a matplotlib scatter with a y=x reference line.
+        """
         plt.figure(figsize=(10, 10))
         plt.scatter(p_values_labels, p_values_idws, alpha=0.5)
 
@@ -345,17 +348,16 @@ class TCNAnalysis:
     @staticmethod
     def filter_tcn_list_according_to_center_cell(tcn_list: List[TCN], cell_type_group: List[str]) -> Tuple[List[TCN], List[bool]]:
         """
-        Filters TCN objects according to their center cell type.
+        Keeps only those TCNs whose center cell belongs to one of the given types.
 
-        Parameters:
-        tcn_list : List[TCN]
-            The list of TCN objects.
-        cell_type_group : List[str]
-            The cell type group.
+        Args:
+            tcn_list: List of TCN objects.
+            cell_type_group: Cell types to allow at the center.
 
         Returns:
-        List[TCN]
-            A list of TCN objects filtered according to their center cell type.
+            Tuple:
+                - filtered_tcns: the subset of TCNs passing the filter.
+                - mask: list of booleans same length as `tcn_list`.
         """
         tcn_group_mask = [tcn.is_tcn_center_cell_in_types(cell_type_group) for tcn in tcn_list]
         tcn_group = [tcn for tcn, mask in zip(tcn_list, tcn_group_mask) if mask]
@@ -364,17 +366,14 @@ class TCNAnalysis:
     @staticmethod
     def filter_tcn_list_homogenous_clusters(tcn_list: List[TCN], cell_type_group: List[str]) -> List[TCN]:
         """
-        Filters TCN objects that are homogenous.
+        Keeps only those TCNs composed exclusively of the given cell types.
 
-        Parameters:
-        tcn_list : List[TCN]
-            The list of TCN objects.
-        cell_type_group : List[str]
-            The cell type group.
+        Args:
+            tcn_list: List of TCN objects.
+            cell_type_group: Cell types that may appear anywhere in the TCN.
 
         Returns:
-        List[TCN]
-            A list of TCN objects that have homogenous clusters.
+            List[TCN]: subset that are homogeneous in the given types.
         """
         tcn_group_mask = [tcn.is_homogenous_tcn_in_type(cell_type_group) for tcn in tcn_list]
         tcn_group = [tcn for tcn, mask in zip(tcn_list, tcn_group_mask) if mask]
@@ -383,33 +382,29 @@ class TCNAnalysis:
     @staticmethod
     def sum_tcn(tcns: List[TCN]) -> TCN:
         """
-        Sums the TCN objects in the list.
+        Element‐wise sums a list of TCN objects via their `__add__`.
 
-        Parameters:
-        tcns : List[TCN]
-            The list of TCN objects.
+        Args:
+            tcns: List of TCN to sum.
 
         Returns:
-        TCN
-            The sum of the TCN objects.
+            TCN: the cumulative sum.
         """
         return reduce(lambda x, y: x + y, tcns)
     
     @staticmethod
     def map_tcn_list_to_meta_types(tcn_list: List[TCN], meta_types: Dict[str, str]) -> List[TCN]:
         """
-        Maps TCN objects to meta types.
+        Applies `get_remap_cell_types_tcn_object` to every TCN in a list. Basicly allows to remap cell types to new types. 
 
-        Parameters:
-        tcn_list : List[TCN]
-            The list of TCN objects.
-        meta_types : Dict[str, str]
-            The meta types.
+        Args:
+            tcn_list: List of TCN objects.
+            meta_types: Mapping from original cell type → meta‐group name or None.
 
         Returns:
-        List[TCN]
-            The list of TCN objects mapped to meta types.
+            List[TCN]: remapped clones.
         """
+        ...
         new_tcn_list = []
         for tcn in tcn_list:
             new_tcn = tcn.get_remap_cell_types_tcn_object(meta_types)
@@ -419,17 +414,15 @@ class TCNAnalysis:
     @staticmethod
     def compute_pca_for_tcn_list(tcn_list: List[TCN], use_center_cells: bool = False, pca_n_comp: int = 10) -> np.ndarray:
         """
-        Computes PCA for the TCN objects.
+        Runs PCA on either each center‐cell embedding or the full normalized TCNs.
 
-        Parameters:
-        tcn_list : List[TCN]
-            The list of TCN objects.
-        use_center_cells : bool, optional
-            If true use the embedding of the center cell instead of the whole TCN, by default False.
+        Args:
+            tcn_list: List of TCN objects.
+            use_center_cells: If True, uses only the hop-0 row per TCN.
+            pca_n_comp: Number of principal components to return.
 
         Returns:
-        np.ndarray
-            The PCA.
+            np.ndarray: shape (n_tcns, pca_n_comp) of PCA scores.
         """
         if use_center_cells:
             tcn_arrs = [tcn.tcn_arr[0,:] for tcn in tcn_list]
@@ -446,23 +439,17 @@ class TCNAnalysis:
     @staticmethod
     def calculate_original_marker_rep_TCN_with_IDWS(subgraphs: np.ndarray, scores: np.ndarray, vertices: np.ndarray) -> Tuple[List[TCN], Dict[Tuple[int, int], Dict[int, float]], List[int]]:
         """
-        Calculates and returns a list of TCN objects with associated IDWS scores. The TCN in this case is represented by the original marker distribution.
-        
-        Parameters:
-        subgraphs : np.ndarray
-            Array indicating subgraph membership of vertices.
-        scores : np.ndarray
-            Array of IDWS scores for each vertex.
-        vertices : np.ndarray
-            Array of vertices.
+        Builds marker‐based TCNs (4 hops × markers) with associated IDWS scores.
+
+        Args:
+            subgraphs: 1D array of subgraph IDs per vertex.
+            scores: 1D array of IDWS scores per vertex.
+            vertices: 1D array of vertex IDs aligned with `subgraphs` & `scores`.
 
         Returns:
-        List[TCN]
-            A list of TCN objects.
-        Dict[Tuple[int, int], Dict[int, float]]
-            A dictionary of IDWS scores.
-        List[int]
-            A list of length equal to the number of TCNs, indicating the index of the TCN center cell out of vertices.
+            tcns: List of marker‐based TCNs.
+            scores_per_fov: per‐(run,fov)→cell→score dict.
+            tcns_center_cell_indices: List of original vertex‐array indices.
         """
         tcns = []
         scores_per_fov = defaultdict(dict) 
@@ -520,6 +507,19 @@ class TCNAnalysis:
 
     @staticmethod
     def _generate_combinations(cell_type_group: List[str], cell_type_indexing: Dict[str, int], is_merge_2_and_3=True) -> List[Tuple[np.ndarray, List[int]]]:
+        """
+        Generates all binary presence/absence combinations for given cell types over hops.
+
+        Args:
+            cell_type_group: List of cell types to include.
+            cell_type_indexing: Map from cell type name to column index.
+            is_merge_2_and_3: If True, merge hops 2 and 3 for combination generation.
+
+        Returns:
+            List of tuples (comb_matrix, indices) where:
+                comb_matrix: np.ndarray of shape (4 or 3, len(indices)), binary patterns.
+                indices: list of column indices corresponding to `cell_type_group`.
+        """
         indices = [cell_type_indexing[cell] for cell in cell_type_group]
         if is_merge_2_and_3:
             combinations = list(itertools.product([0, 1], repeat=2 * len(indices)))
@@ -531,6 +531,19 @@ class TCNAnalysis:
 
     @staticmethod
     def _match_combinations(args):
+        """
+        Helper for multiprocessing; matches TCN data against provided combinations.
+
+        Args:
+            args: A tuple containing:
+                - tcn_data: dict with keys 'binary_tcn' and 'tcn'.
+                - combinations: list of (comb_matrix, indices).
+                - indices: list of indices to check in binary_tcn.
+                - is_merge_2_and_3: merge flag as above.
+
+        Returns:
+            List of matches where combination pattern equals binary_tcn slices.
+        """
         tcn_data, combinations, indices, is_merge_2_and_3 = args
         results = []
         binary_tcn = np.array(tcn_data['binary_tcn'])
@@ -546,6 +559,18 @@ class TCNAnalysis:
 
     @staticmethod
     def count_tcns_and_patients(tcns: List[TCN], cell_type_group: List[str], is_merge_2_and_3=True, batch_size=100) -> Dict[Tuple[Tuple[int], int], List[TCN]]:
+        """
+        Batches through all presence/absence patterns and groups TCNs accordingly.
+
+        Args:
+            tcns: list of TCN objects to count.
+            cell_type_group: Cell types to consider in combinations.
+            is_merge_2_and_3: Whether to merge hops 2 and 3.
+            batch_size: number of combinations per parallel batch.
+
+        Returns:
+            Dict mapping each flattened combination tuple to list of TCNs matching it.
+        """
         results = {}
         cell_type_indexing = tcns[0].cell_type_indexing
         combinations = TCNAnalysis._generate_combinations(cell_type_group, cell_type_indexing, is_merge_2_and_3)
@@ -573,15 +598,16 @@ class TCNAnalysis:
     @staticmethod
     def plot_combination_heatmap(combination: np.ndarray, cell_type_group: List[str], remove_center: bool = True, combination_number: int = 1) -> None:
         """
-        Plots a heatmap for the given combination and cell type group.
+        Saves a heatmap SVG for a single binary combination of cell types.
 
-        Parameters:
-        combination : np.ndarray
-            The flattened combination representation.
-        cell_type_group : List[str]
-            The cell type group.
-        remove_center : bool, optional
-            Whether to remove the center cell, by default True.
+        Args:
+            combination: Flattened binary combination array.
+            cell_type_group: List of cell type names.
+            remove_center: If True, omit hop-0 row from plot.
+            combination_number: Identifier used in SVG filename.
+
+        Returns:
+            None — writes 'combination_heatmap_{combination_number}.svg'.
         """
         fig, ax = plt.subplots(figsize=(12, 8))
 
@@ -614,6 +640,22 @@ class TCNAnalysis:
                                         min_patients: int = 2, 
                                         significance_level: float = 0.05, 
                                         use_original_labels: bool = False) -> Tuple[Dict[Tuple[int, ...], List['TCN']], Dict[Tuple[int, ...], float], Dict[Tuple[int, ...], int]]:
+        """
+        Filters TCN groups by Fisher's test on inside vs. outside responder counts.
+
+        Args:
+            tcns_dict: Map from combination tuple to list of TCNs.
+            idws_scores: as above.
+            min_cells: Min TCN count to consider.
+            min_patients: Min unique patients required.
+            significance_level: p-value cutoff.
+            use_original_labels: If True, use TCN.label instead of idws_scores.
+
+        Returns:
+            filtered_dict: combinations meeting criteria.
+            p_values: p-value per combination.
+            significant_indices: mapping from running index to combination.
+        """
         filtered_tcns_dict = {comb: tcns for comb, tcns in tcns_dict.items() if len(tcns) >= min_cells}
         
         significant_combinations = {}
@@ -657,6 +699,17 @@ class TCNAnalysis:
 
     @staticmethod
     def get_global_center_cell_dist(tcns_dict, idws_scores, use_original_labels):
+        """
+        Computes total global counts of positive and negative center cells.
+
+        Args:
+            tcns_dict: as above.
+            idws_scores: as above.
+            use_original_labels: If True, count by TCN.label.
+
+        Returns:
+            Tuple (global_positive_count, global_negative_count).
+        """
         global_positive_count, global_negative_count = 0, 0
         for _, cluster_tcns in tcns_dict.items():
             global_positive_count, global_negative_count = TCNAnalysis.get_inside_center_cell_dist(idws_scores, use_original_labels, global_positive_count, global_negative_count, cluster_tcns)
@@ -664,6 +717,19 @@ class TCNAnalysis:
 
     @staticmethod
     def get_inside_center_cell_dist(idws_scores, use_original_labels, global_positive_count, global_negative_count, cluster_tcns):
+        """
+        Accumulates inside-cluster responder/non-responder counts.
+
+        Args:
+            idws_scores: as above.
+            use_original_labels: If True, use labels.
+            pos_count: initial positive count.
+            neg_count: initial negative count.
+            cluster_tcns: list of TCNs in the cluster.
+
+        Returns:
+            Updated (pos_count, neg_count) after processing cluster.
+        """
         for tcn in cluster_tcns:
             if use_original_labels:
                 if tcn.label[0] == 1:
@@ -684,20 +750,14 @@ class TCNAnalysis:
     @staticmethod
     def validate_TCN(tcn: 'TCN', combination: np.ndarray) -> bool:
         """
-        Validates whether the TCN follows the pattern defined by the combination and checks if the
-        cell_type_indices agrees with the expected pattern.
+        Verifies a TCN's binary and index maps against expected combination.
 
-        Parameters:
-        tcn : TCN
-            The TCN object containing the cell type indices and tcn array.
-        combination : np.ndarray
-            The flattened combination representation indicating where cells should be present for each hop and cell type.
-        cell_type_group : list
-            A list of relevant cell types to check (subset of all cell types).
+        Args:
+            tcn: TCN object with `tcn_arr` and `cell_type_indeces_dict`.
+            combination: Flattened binary pattern array for relevant cell types.
 
         Returns:
-        bool
-            True if the TCN behaves according to the combination pattern and cell_type_indices agrees, otherwise False.
+            True if actual matches expected, False otherwise (prints discrepancy).
         """
         cell_type_group = ["T.CD4", "T.CD8", "T.cell", "B.cell", "Macrophage", "NK"] 
         num_hops = 4  # There are 4 hops including the center (hop 0)
@@ -748,16 +808,16 @@ class TCNAnalysis:
     @staticmethod
     def remove_dependent_cells(profiles, threshold=0.9):
         """
-        Identify and remove linearly dependent markers based on correlation.
-        
+        Drops highly correlated marker columns from `profiles`.
+
         Args:
-            profiles (np.ndarray): Matrix of marker profiles.
-            threshold (float): Correlation threshold to consider markers as linearly dependent.
-            
+            profiles: 2D array (cells × markers).
+            threshold: Correlation cutoff to mark dependence.
+
         Returns:
-            (np.ndarray, dict, list): A tuple of the filtered profiles, a dictionary mapping removed
-                                    markers to the marker they were dependent on, and a list of 
-                                    indices for independent markers.
+            filtered_profiles: array with dependent columns removed.
+            to_remove: map removed_idx→dependent_on_idx.
+            independent_indices: list of kept column indices.
         """
         num_markers = profiles.shape[1]
         correlation_matrix = np.corrcoef(profiles, rowvar=False)
@@ -789,6 +849,25 @@ class TCNAnalysis:
         csv_path: str = None, required_fracture: float = 0.5, 
         is_conservative: bool = False, 
     ) -> Dict[Tuple[int, ...], Tuple[Dict[int, Dict[str, Tuple[float, float]]], Dict[Tuple[int, int, str], Tuple[float, float]]]]:
+        """
+        Performs conservative per-cell-type, per-hop marker significance testing with FDR.
+
+        Args:
+            significant_combinations: Mapping from combination tuple to list of cluster TCNs.
+            idws_scores: Mapping from (run_id, fov_id) to cell->IDWS score.
+            cell_profile_mapping: Per-(run,fov), per-cell marker profiles.
+            tcns_dict: All TCN clusters for global baseline.
+            use_original_labels: If True, use TCN.label instead of IDWS.
+            idws_thresh: Threshold for IDWS-based responder definitions.
+            csv_path: Path to write detailed CSV; if None, skip writing.
+            required_fracture: Fraction filter for marker inclusion.
+            is_conservative: If True, require both responder/non-resp above threshold.
+
+        Returns:
+            Dict mapping combination to:
+                - cell_type_hop_significance: hop->cell_type->(direction, -log10(p))
+                - marker_p_values: (hop,marker,cell_type)->(direction,p)
+        """
         
         assert 0 <= idws_thresh <= 1, "idws_thresh must be between 0 and 1."
         high_throuput_marker_mask = TCNAnalysis.filter_markers_low_throughput(significant_combinations, cell_profile_mapping)
@@ -866,18 +945,20 @@ class TCNAnalysis:
     @staticmethod
     def get_marker_pval_direc_nb(responder_profiles, non_responder_profiles, idx, alpha=1e-6, maxiter=1000):
         """
-        Test whether a marker is differentially expressed between responders and non-responders
-        using negative binomial regression.
+        Fits a regularized Negative Binomial to test marker differential expression.
 
-        Parameters:
-        responder_profiles (ndarray): 2D array where rows are cells and columns are markers for responders.
-        non_responder_profiles (ndarray): 2D array where rows are cells and columns are markers for non-responders.
-        idx (int): Index of the marker to test.
-        alpha (float): Regularization parameter for ridge regression.
-        maxiter (int): Maximum number of iterations for the optimizer.
+        Args:
+            responder_profiles: 2D int array of responder counts per marker.
+            non_responder_profiles: 2D int array for non-responders.
+            idx: Index of marker column to test.
+            alpha: Regularization strength for NB regression.
+            maxiter: Max iterations for optimizer.
 
         Returns:
-        tuple: p-value and directionality ('upregulated in responders' or 'downregulated in responders').
+            Tuple (p_value, directionality) where directionality is +1 or -1.
+
+        Raises:
+            ValueError: if counts are negative or non-integer.
         """
         # Extract expression values for the specified marker
         res_profiles = responder_profiles[:, idx]
@@ -917,15 +998,15 @@ class TCNAnalysis:
     @staticmethod
     def get_marker_pval_direc_mw(responder_profiles, non_responder_profiles, idx):
         """
-        Test whether a marker is differentially expressed between responders and non-responders.
+        Tests marker difference via Mann–Whitney U.
 
-        Parameters:
-        responder_profiles (ndarray): 2D array where rows are cells and columns are markers for responders.
-        non_responder_profiles (ndarray): 2D array where rows are cells and columns are markers for non-responders.
-        idx (int): Index of the marker to test.
+        Args:
+            responder_profiles: 2D array of marker expressions for responders.
+            non_responder_profiles: 2D array for non-responders.
+            idx: Marker column index.
 
         Returns:
-        tuple: p-value and directionality ('upregulated in responders' or 'downregulated in responders').
+            Tuple (p_value, directionality).
         """
         # Extract expression values for the specified marker
         expr_responder = responder_profiles[:, idx]
@@ -945,6 +1026,21 @@ class TCNAnalysis:
     
     @staticmethod
     def filter_profiles_to_rel_markers(hop, cell_type, responder_markers, non_responder_markers, high_throuput_marker_mask, required_fracture, is_conservative):
+        """
+        Filters marker profiles to those passing fraction criteria.
+
+        Args:
+            hop: Hop index.
+            cell_type: Name of cell type.
+            responder_markers: nested dict hop->ct->list of profiles.
+            non_responder_markers: same for non-responders.
+            high_throughput_marker_mask: Boolean mask of markers.
+            required_fracture: fraction threshold.
+            is_conservative: AND vs OR logic for threshold.
+
+        Returns:
+            Tuple (responder_profiles, non_responder_profiles, rel_marker_indices).
+        """
         num_markers = len(responder_markers[0][list(responder_markers[0].keys())[0]][0])
         responder_profiles = np.array([np.asarray(p) for p in responder_markers[hop][cell_type] if len(p) == num_markers])
         non_responder_profiles = np.array([np.asarray(p) for p in non_responder_markers[hop][cell_type] if len(p) == num_markers])
@@ -969,6 +1065,20 @@ class TCNAnalysis:
         included_cells_non_responder, 
         hop, 
         cell_type):
+        """
+        Fisher test and direction for a single cell-type hop contingency.
+
+        Args:
+            included_cells_responder_global: global sets per hop->ct.
+            included_cells_non_responder_global: likewise for non-responders.
+            included_cells_responder: inside-cluster sets.
+            included_cells_non_responder: inside-cluster sets.
+            hop: Hop index.
+            cell_type: Cell type name.
+
+        Returns:
+            Tuple (p_value, directionality).
+        """
         
         # Calculate counts of cells inside the TCN cluster
         inside_positive_count = len(included_cells_responder[hop][cell_type])
@@ -1007,6 +1117,16 @@ class TCNAnalysis:
 
     @staticmethod
     def get_significant_idws_cells(idws_scores, idws_thresh):
+        """
+        Splits idws_scores into above-thresh and below-thresh sets.
+
+        Args:
+            idws_scores: map (run,fov)->cell->score.
+            idws_thresh: absolute threshold.
+
+        Returns:
+            Tuple of two dicts for >=+thresh and <=-thresh cells.
+        """
         idws_above_thresh = {
             (run_id, fov_id): {cell_id for cell_id, score in scores.items() if score >= idws_thresh}
             for (run_id, fov_id), scores in idws_scores.items()
@@ -1020,6 +1140,19 @@ class TCNAnalysis:
 
     @staticmethod
     def get_global_cell_ids_per_ct_hop(significant_combinations, cell_profile_mapping, use_original_labels, high_throuput_marker_mask, idws_above_thresh, idws_below_thresh):
+        """
+        Aggregates global inside/outside cell ID sets for all combinations.
+
+        Args:
+            significant_combinations: map from comb->tcns.
+            cell_profile_mapping: map from (run,fov)->cell->profile.
+            use_original_labels: whether to use TCN.label.
+            high_throughput_marker_mask: boolean mask of markers.
+            idws_above_thresh/below: sets from get_significant_idws_cells.
+
+        Returns:
+            Tuple of two nested dicts: hop->ct->set of cell tuples (global inside).
+        """
         included_cells_responder_global = defaultdict(lambda: defaultdict(set))
         included_cells_non_responder_global = defaultdict(lambda: defaultdict(set))
         for combination, cluster_tcns in significant_combinations.items():
@@ -1033,6 +1166,15 @@ class TCNAnalysis:
 
     @staticmethod
     def update_global_cell_dicts(included_cells_responder_global, included_cells_non_responder_global, included_cells_responder_comb, included_cells_non_responder_comb):
+        """
+        Merges combination-specific cell sets into global dictionaries.
+
+        Args:
+            included_cells_responder_global: hop->ct->set to update.
+            included_cells_non_responder_global: likewise.
+            included_cells_responder_comb: hop->ct->set from a cluster.
+            included_cells_non_responder_comb: hop->ct->set.
+        """
         for hop, cell_types in included_cells_responder_comb.items():
             for cell_type, cell_set in cell_types.items():
                 included_cells_responder_global[hop][cell_type].update(cell_set)
@@ -1043,6 +1185,23 @@ class TCNAnalysis:
 
     @staticmethod
     def get_cell_stat_per_ct_hop_in_comb(cell_profile_mapping, use_original_labels, high_throuput_marker_mask, idws_above_thresh, idws_below_thresh, cluster_tcns):
+        """
+        Collects marker profiles and cell-ID sets inside a TCN cluster by hop & cell type.
+
+        Args:
+            cell_profile_mapping: map (run,fov)->cell->profile.
+            use_original_labels: whether to use TCN.label.
+            high_throughput_marker_mask: boolean mask.
+            idws_above_thresh/below: sets of significant cells.
+            cluster_tcns: list of TCNs in the cluster.
+
+        Returns:
+            Tuple of four nested dicts:
+                - responder_markers: hop->ct->[profiles]
+                - non_responder_markers: hop->ct->[profiles]
+                - included_cells_responder: hop->ct->set of (run,fov,cell)
+                - included_cells_non_responder: hop->ct->set
+        """
         responder_markers = defaultdict(lambda: defaultdict(list))
         non_responder_markers = defaultdict(lambda: defaultdict(list))
         included_cells_responder = defaultdict(lambda: defaultdict(set))
@@ -1084,6 +1243,17 @@ class TCNAnalysis:
 
     @staticmethod
     def filter_markers_low_throughput(significant_combinations, cell_profile_mapping, precntile = 0.01):
+        """
+        Creates a boolean mask to drop low-throughput markers.
+
+        Args:
+            significant_combinations: map comb->tcns to index marker_tcn_arr dims.
+            cell_profile_mapping: per-(run,fov) cell->profile dict.
+            precntile: minimal fraction of cells expressing marker.
+
+        Returns:
+            Boolean array of length n_markers indicating keep/drop.
+        """
         num_markers = significant_combinations[list(significant_combinations.keys())[0]][0].marker_tcn_arr.shape[1]
         total_marker_counts = np.zeros(num_markers)
 
@@ -1106,6 +1276,19 @@ class TCNAnalysis:
                             marker_names: List[str],  marker_expr_results: Dict,
                             top_n: int = 10,
                             csv_path: str = None) -> Dict[Tuple[int, ...], Dict[Tuple[int, str], List[Tuple[str, Tuple[float, float]]]]]:
+
+        """Builds a top-N marker signature per combination for each cell type and hop.
+
+        Args:
+            marker_results: Mapping from combination to (cell_type_hop_significance, marker_p_values).
+            marker_names: List of marker names by index.
+            marker_expr_results: Expression values per combination/hop/marker.
+            top_n: Number of top markers to include per cell-type/hop.
+            csv_path: Optional path to save detailed signature CSV.
+
+        Returns:
+            signature: Dict mapping combination -> {(hop, cell_type): [(marker, (direction, p_value, mean_expr))...]}
+        """
         
         # Create a deep copy of marker_results to prevent any unintended modifications
         marker_results_copy = copy.deepcopy(marker_results)
@@ -1144,65 +1327,17 @@ class TCNAnalysis:
         
         return signature
 
-    # @staticmethod
-    # def plot_cell_type_significance(cell_type_hop_significance: Dict[int, Dict[str, Tuple[int, float]]], combination_name: str = "") -> None:
-    #     # Extract hops and cell types
-    #     hops = list(cell_type_hop_significance.keys())
-    #     cell_types = sorted(set(cell_type for hop_data in cell_type_hop_significance.values() for cell_type in hop_data.keys()))
-        
-    #     # Create a heatmap initialized with NaN for missing data
-    #     heatmap = np.full((len(cell_types), len(hops)), np.nan)
-
-    #     for hop_idx, hop in enumerate(hops):
-    #         for cell_type_idx, cell_type in enumerate(cell_types):
-    #             if cell_type in cell_type_hop_significance[hop]:
-    #                 # Multiply direction by -log10(p-value)
-    #                 direction, p_value = cell_type_hop_significance[hop][cell_type]
-    #                 print(f"pvalue of {cell_type} in hop {hop_idx} is {p_value}")
-    #                 heatmap[cell_type_idx, hop_idx] = direction * p_value
-
-    #     fig, ax = plt.subplots(figsize=(12, 8))
-
-    #     # Create a new axis for the color bar
-    #     divider = make_axes_locatable(ax)
-    #     cax = divider.append_axes("right", size="5%", pad=0.05)
-
-    #     # Create a colormap that handles NaN values as white
-    #     cmap = plt.get_cmap('coolwarm')
-    #     cmap.set_bad(color='white')  # Set NaN values to appear as white
-
-    #     # Display the heatmap using imshow for finer control
-    #     cax_im = ax.imshow(heatmap, cmap=cmap, vmin=-3, vmax=3, aspect='auto')
-
-    #     # Add the color bar
-    #     fig.colorbar(cax_im, cax=cax, label='Direction * -log10(p-value)')
-
-    #     # Set ticks for hops and cell types
-    #     ax.set_xticks(range(len(hops)))
-    #     ax.set_yticks(range(len(cell_types)))
-
-    #     ax.set_xticklabels([f'{hop}-Hop' for hop in hops], rotation=0, fontsize=14)
-    #     ax.set_yticklabels(cell_types, fontsize=14)
-
-    #     # Add minor ticks for the grid
-    #     ax.set_xticks(np.arange(len(hops) + 1) - .5, minor=True)
-    #     ax.set_yticks(np.arange(len(cell_types) + 1) - .5, minor=True)
-
-    #     # Configure grid lines for the borders
-    #     ax.tick_params(which='minor', size=0)
-    #     ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
-
-    #     # Final adjustments and displaying the plot
-    #     # plt.xlabel('Hops')
-    #     # plt.ylabel('Cell Types')
-    #     plt.tight_layout()
-        # plt.savefig("ct_sig.svg", dpi=1200, facecolor='white', edgecolor='white', bbox_inches='tight')
-        # plt.close()
-    #     plt.show()
-
-
     @staticmethod
     def plot_cell_type_significance(cell_type_hop_significance: Dict[int, Dict[str, Tuple[int, float]]], combination_name: str = "") -> None:
+        """Saves a heatmap visualizing direction × -log10(p) per cell type and hop.
+
+        Args:
+            cell_type_hop_significance: hop->cell_type->(direction, -log10(p_value)).
+            combination_name: Optional string used in output filename.
+
+        Returns:
+            None — writes ‘ct_sig_{combination_name}.svg’.
+        """
         from matplotlib.colors import LinearSegmentedColormap
         # Extract hops and cell types
         hops = list(cell_type_hop_significance.keys())
@@ -1288,6 +1423,17 @@ class TCNAnalysis:
 
     @staticmethod
     def plot_marker_signature(signature: Dict[Tuple[int, str], List[Tuple[str, Tuple[float, float]]]], combination_name: str = "", use_expr: bool = False):
+        """
+        Renders a heatmap of marker significance or expression per (hop, cell_type).
+
+        Args:
+            signature: Mapping from (hop, cell_type) to [(marker, (direction, p_value or expr))].
+            combination_name: Identifier for file naming.
+            use_expr: If True, plot direction × mean expression instead of -log10(p).
+
+        Returns:
+            None — writes ‘marker_heatmap_{combination_name}.svg’.
+        """
         from mpl_toolkits.axes_grid1 import make_axes_locatable
         if not signature:
             print("No data to plot. The signature is empty.")
@@ -1346,7 +1492,21 @@ class TCNAnalysis:
         significance_threshold: float = 0.05, 
         combined_pvalue_threshold: float = 0.05
     ) -> Dict[Tuple[int, ...], Dict[str, Dict[Tuple[str, str, int, int, str], List[Tuple[str, str, float]]]]]:
-        
+        """
+        Assigns significant markers to ligand–receptor interactions per pathway.
+
+        Args:
+            marker_results: As in construct_signature.
+            pathway_data: DataFrame with columns ['Pathway','Ligand','Receptor'].
+            marker_names: List of marker names.
+            top_n_markers: Limit per marker, None for all.
+            significance_threshold: p-value cutoff for marker inclusion.
+            combined_pvalue_threshold: Fisher-combined p-value cutoff.
+
+        Returns:
+            categorized_markers: combination -> group ('Responders'/'Non-Responders') ->
+                (ligand_ct,ligand_hop,receptor_ct,receptor_hop,pathway) -> [(ligand,receptor,combined_p)].
+        """
         marker_results_copy = copy.deepcopy(marker_results)
         categorized_markers = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
@@ -1384,7 +1544,18 @@ class TCNAnalysis:
 
     @staticmethod
     def get_distinct_color(existing_colors):
-        """Get a distinct color from a colormap, avoiding existing colors."""
+            """
+        Selects a new color from matplotlib tab20 not in existing_colors.
+
+        Args:
+            existing_colors: Set of RGBA tuples already used.
+
+        Returns:
+            A new RGBA tuple.
+
+        Raises:
+            ValueError: if all tab20 colors are exhausted.
+        """
         cmap = plt.get_cmap('tab20')  # Or use another colormap if needed
         max_colors = cmap.N  # Number of distinct colors in the colormap
 
@@ -1398,6 +1569,19 @@ class TCNAnalysis:
 
     @staticmethod
     def plot_network(pathways, unique_types, combination_name, type_colors=None, ax=None):
+    """
+        Draws a multi‐graph of cell‐type interactions on concentric hop circles.
+
+        Args:
+            pathways: mapping from pathway key -> marker list.
+            unique_types: list of (ligand,receptor) pairs.
+            combination_name: used for title.
+            type_colors: existing ligand–receptor color map.
+            ax: matplotlib Axes; if None, uses current.
+
+        Returns:
+            Updated type_colors mapping.
+        """
         RADIUS = 3
         cell_type_styles = {
             "B.cell": {'shape': 's', 'color': 'red'},
@@ -1488,6 +1672,20 @@ class TCNAnalysis:
         
     @staticmethod
     def prepare_and_plot_network(categorized_markers, combination, combination_name="", group="Responders", csv_path=None, typed_colors=None):
+    """
+        Produces side‐by‐side network plots for responders vs. non‐responders.
+
+        Args:
+            categorized_markers: as from categorize_markers_by_pathway.
+            combination: specific combination key.
+            combination_name: plot title prefix.
+            group: 'Responders' or 'Non-Responders'.
+            csv_path: path to append pathway CSV.
+            typed_colors: initial color map.
+
+        Returns:
+            None — shows and optionally saves legend and plots.
+        """
         # Filter pathways based on group
         pathways_res = categorized_markers[combination].get("Responders", {})
         pathways_nres = categorized_markers[combination].get("Non-Responders", {})
@@ -1554,6 +1752,17 @@ class TCNAnalysis:
     def plot_global_cell_type_significance(marker_results: Dict, 
                                         significance_threshold: float = 0.05, 
                                         display_threshold: float = 0.5):
+    """
+        Aggregates across combinations and displays a heatmap of cell-type significance.
+
+        Args:
+            marker_results: mapping from combination to (significance & marker_pvalues).
+            significance_threshold: p-level to include.
+            display_threshold: p-level for display cutoff.
+
+        Returns:
+            None — shows a combined heatmap.
+        """
         # Collect overall cell type significance across combinations
         marker_results_copy = copy.deepcopy(marker_results)
         cell_type_significance = defaultdict(lambda: defaultdict(list))
@@ -1636,26 +1845,26 @@ class TCNAnalysis:
         debug=False,         # Debug flag
     ):
         """
-        Combine p-values with their corresponding directions using Stouffer's method.
+        Combines p-values using the specified method (currently Stouffer) with directional signs.
 
-        Parameters:
-        - p_values (list or array-like): List of p-values to combine.
-        - directions (list or array-like): List of directions corresponding to each p-value.
-                                        Use +1 for positive direction, -1 for negative direction.
-        - method (str): Method to combine p-values. Currently supports 'stouffer'.
-        - weights (list or array-like, optional): Weights for each p-value. Must be same length as p_values.
-        - alternative (str): Defines the alternative hypothesis. 
-                            Options are 'two-sided', 'greater', 'less'.
-        - clamp_extremes (bool): If True, clamps p-values to [epsilon_min, 1 - epsilon_min].
-        - epsilon_min (float): Small number used for clamping p-values away from 0.
-        - epsilon_max (float): Small number used for clamping p-values away from 1.
-                                Defaults to 1 - epsilon_min.
-        - debug (bool): If True, prints detailed debug information.
-        - z_cap (float): Maximum absolute value for Z-scores to prevent overflow.
+        Args:
+            p_values: List of p-values to combine. Must match length of `directions`.
+            directions: List of +1/-1 indicating effect direction per p-value.
+            method: Combination method; only 'stouffer' supported.
+            weights: Optional weights for each p-value; defaults to equal weights.
+            alternative: 'two-sided', 'greater', or 'less'.
+            clamp_extremes: If True, clamp p-values to [epsilon_min, epsilon_max].
+            epsilon_min: Minimum clamp bound (default 1e-15).
+            epsilon_max: Maximum clamp bound; if None, set to 1 - epsilon_min.
+            debug: If True, prints debugging info during calculation.
 
         Returns:
-        - combined_z (float): The combined Z-score.
-        - combined_p (float): The combined p-value.
+            combined_z: float — combined Z-score.
+            combined_p: float — two-tailed p-value corresponding to combined_z.
+
+        Raises:
+            ValueError: for invalid inputs (length mismatch, invalid p/d, non-finite values).
+            NotImplementedError: if unsupported method is requested.
         """
 
         # Set epsilon_max if not provided
@@ -1802,6 +2011,19 @@ class TCNAnalysis:
 
     @staticmethod
     def plot_global_pathway_network(categorized_markers, typed_colors=None, cell_types_to_plot=None, restrict_mal_to_center=False, plot_unique_pathways_only=False):
+        """
+        Plots side-by-side global ligand–receptor networks for responders vs. non-responders.
+
+        Args:
+            categorized_markers: Output of `categorize_markers_by_pathway`.
+            typed_colors: Optional existing color map for ligand/receptor pairs.
+            cell_types_to_plot: If provided, restrict nodes to these cell types.
+            restrict_mal_to_center: If True, only include 'Mal' at hop 0.
+            plot_unique_pathways_only: If True, exclude pathways common to both groups.
+
+        Returns:
+            None — displays a Matplotlib figure with two network subplots.
+        """
         all_pathways_responders = {}
         all_pathways_non_responders = {}
         unique_types_responders = set()
@@ -1927,15 +2149,16 @@ class TCNAnalysis:
         marker_results_copy: Dict[str, Tuple[bool, Dict[Tuple[int, int, str], Tuple[int, float]]]]
     ) -> Dict[str, Dict[str, List[float]]]:
         """
-        Process marker results to combine p-values and compute combined z-scores.
+        Aggregates combined marker z-scores and p-values with detailed metadata.
 
-        Parameters:
-        - marker_names (List[str]): List of marker names.
-        - significance_threshold (float): Threshold for significance.
-        - marker_results_copy (Dict): Copy of marker results.
+        Args:
+            marker_names: List of all marker names.
+            significance_threshold: Threshold for p-values to include.
+            marker_results_copy: Deep copy of marker results mapping.
 
         Returns:
-        - combined_marker_results (Dict): Combined z-scores and p-values for markers.
+            combined_marker_results: Dict mapping marker name ->
+                {'z': combined_z, 'p': combined_p, 'z_scores': [...], 'details': [...]}
         """
         marker_significance = defaultdict(lambda: {'p_values': [], 'directions': [], 'details': []})
         combined_marker_results = defaultdict(dict)
@@ -2046,18 +2269,17 @@ class TCNAnalysis:
         significance_threshold: float = 0.05, 
     ):
         """
-        Plot top markers based on combined z-scores using horizontal bar plots,
-        separated by Responders and Non-Responders in a single figure.
+        Plots horizontal bar charts of top N markers by combined z-score for responders/non-responders.
 
-        Parameters:
-        - marker_results (Dict[str, Tuple[bool, Dict[Tuple[int, int, str], Tuple[int, float]]]]): 
-            Marker results containing significance and details.
-        - marker_names (List[str]): List of marker names to consider.
-        - marker_expr_results (Dict, optional): Deprecated, kept for compatibility.
-        - top_n_responders (int): Number of top Responders to plot.
-        - top_n_nonresponders (int): Number of top Non-Responders to plot.
-        - significance_threshold (float): Threshold for significance.
-        - sort_by_difference (bool): If True, sort markers by difference in z-scores.
+        Args:
+            marker_results: Mapping from combination to (flag, marker_p_values).
+            marker_names: List of marker names.
+            top_n_responders: Number of top responder markers to plot.
+            top_n_nonresponders: Number of top non-responder markers.
+            significance_threshold: p-value cutoff for inclusion.
+
+        Returns:
+            None — writes 'top_markers_significance_with_direction_bar_plot.svg'.
         """
         
         # Deep copy to prevent modifications to original data
@@ -2178,14 +2400,6 @@ class TCNAnalysis:
             ax_non_responder.set_xticks([])
             ax_non_responder.set_yticks([])
         
-        # Add a super title
-        # fig.suptitle('Top Marker Significance with Direction', fontsize=16)
-        
-        # Optionally, add a legend
-        # responder_proxy = Line2D([0], [0], color='skyblue', lw=10, label='Responders')
-        # non_responder_proxy = Line2D([0], [0], color='lightcoral', lw=10, label='Non-Responders')
-        # fig.legend(handles=[responder_proxy, non_responder_proxy], loc='upper right', fontsize=12)
-        
         # # Save the figure
         plt.savefig("top_markers_significance_with_direction_bar_plot.svg", dpi=1200, 
                     facecolor='white', edgecolor='white', bbox_inches='tight')
@@ -2205,9 +2419,21 @@ class TCNAnalysis:
         use_expr: bool = False  # Deprecated, kept for compatibility
     ):
         """
-        Plot top markers based on combined z-scores.
+        Creates side-by-side violin-and-scatter plots of top markers for responders vs. non-responders.
 
-        [Existing docstring content]
+        Args:
+            marker_results: Mapping as above.
+            marker_names: List of names indexed by marker index.
+            marker_expr_results: Deprecated.
+            top_n_responders: Count for responders.
+            top_n_nonresponders: Count for non-responders.
+            significance_threshold: p-value cutoff.
+            include_scatter: If True, overlay individual points.
+            sort_by_difference: If True, sort by difference in z-scores.
+            use_expr: Deprecated; if True uses expression instead of -log10(p).
+
+        Returns:
+            None — writes 'top_markers_combined_violin_enhanced_matplotlib.svg'.
         """
         
         # Deep copy to prevent modifications to original data
@@ -2444,58 +2670,8 @@ class TCNAnalysis:
             axes[1].set_title('Non Responders', fontsize=16)
             axes[1].set_xticks([])
         
-        # fig.suptitle('Top Marker Significance with Direction', fontsize=32)
-        # plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Removed to use constrained_layout
         plt.savefig("top_markers_combined_violin_enhanced_matplotlib.svg", dpi=1200, facecolor='white', edgecolor='white', bbox_inches='tight')
         plt.close()  
-        # plt.show()
-
-    # @staticmethod
-    # def get_all_marker_expressions_by_cell_type_and_label(
-    #     tcns_dict: Dict[Tuple[int, ...], List['TCN']],
-    #     cell_profile_mapping: Dict[Tuple[int, int], Dict[int, np.ndarray]],
-    #     marker_names: List[str],
-    #     num_markers: int = 960
-    # ) -> Dict[str, Dict[str, Dict[str, List[float]]]]:
-    #     """
-    #     Extract all marker expressions per cell type and label (responders/nonresponders) across the dataset.
-
-    #     Args:
-    #         tcns_dict: Dictionary of all TCN clusters, mapping combinations to TCN objects.
-    #         cell_profile_mapping: Dictionary mapping (run_id, fov_id) to cell profiles for each marker.
-    #         marker_names: List of marker names, where index corresponds to marker_idx.
-    #         num_markers: Expected number of markers in cell profiles.
-
-    #     Returns:
-    #         A dictionary structured as {cell_type: {label: {marker_name: all_expressions}}},
-    #         where all_expressions is a concatenated list of expressions across all clusters.
-    #     """
-    #     all_marker_expressions = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-
-    #     for combination, cluster_tcns in tcns_dict.items():
-    #         for tcn in cluster_tcns:
-    #             run_id, fov_id = tcn.run_id[0], tcn.fov_id[0]
-    #             cell_type_indices = tcn.cell_type_indeces_dict
-    #             label = 'Responders' if tcn.label[0] == 1 else 'Non Responders'
-
-    #             for hop in range(4):  # Iterate over all hops
-    #                 for cell_type, cell_indices in cell_type_indices.items():
-    #                     for cell_id in cell_indices[hop]:
-    #                         # Fetch the cell profile for the marker expressions
-    #                         cell_profile = cell_profile_mapping.get((run_id, fov_id), {}).get(cell_id)
-    #                         if cell_profile is None:
-    #                             continue
-    #                         cell_profile = cell_profile.flatten()
-    #                         if len(cell_profile) != num_markers:
-    #                             print(f"Length mismatch: expected {num_markers}, got {len(cell_profile)}")
-    #                             continue
-
-    #                         # Append each marker's expression to the relevant dictionary under the appropriate label
-    #                         for marker_idx, expression_value in enumerate(cell_profile):
-    #                             marker_name = marker_names[marker_idx]
-    #                             all_marker_expressions[cell_type][label][marker_name].append(expression_value)
-
-    #     return all_marker_expressions
 
 
     @staticmethod
@@ -2507,6 +2683,22 @@ class TCNAnalysis:
         num_markers: int = 960,
         idws_thresh: float = 0.5
     ) -> Dict[str, Dict[str, Dict[str, List[float]]]]:
+            """
+        Gathers per-cell expression lists for both original labels and IDWS classes per cell-type.
+
+        Args:
+            tcns_dict: cluster mapping.
+            cell_profile_mapping: per-(run,fov) cell->profile.
+            marker_names: list of marker names.
+            idws_scores: per-cell IDWS scores.
+            num_markers: expected marker count per profile.
+            idws_thresh: threshold for defining responder/non-responder.
+
+        Returns:
+            - all_marker_expressions_orig: cell_type -> (run,fov) -> marker->values
+            - all_marker_expressions_idws: same for IDWS-defined groups
+            - key_to_label_dict: map (run,fov)-> 'Responders'/'Non Responders'
+        """
         
         all_marker_expressions_orig = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         all_marker_experssion_idws = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -2554,13 +2746,17 @@ class TCNAnalysis:
 
     def calculate_individual_z_scores(marker_results, cell_type, marker_names, epsilon_min = 1e-15):
         """
-        Calculates individual z-scores for each marker across different hops and combinations.
+        Computes per-marker, per-hop individual z-scores across combinations for one cell type.
+
+        Args:
+            marker_results: mapping from combination to significance data.
+            cell_type: cell-type to filter.
+            marker_names: list of marker names.
+            epsilon_min: minimum p-value for clamping.
 
         Returns:
-        - marker_z_scores (dict): Dictionary with marker names as keys and another dict as values.
-                                    The inner dict has hops as keys and list of z-scores as values.
-        - marker_details (dict): Dictionary with marker names as keys and another dict as values.
-                                    The inner dict has hops as keys and list of (combination_number, z_score) tuples.
+            - marker_z_scores: marker_name -> hop -> list of z-scores
+            - marker_details: marker_name -> hop -> list of (combination_label, z_score)
         """
         marker_z_scores = defaultdict(lambda: defaultdict(list))
         marker_details = defaultdict(lambda: defaultdict(list))
@@ -2664,15 +2860,18 @@ class TCNAnalysis:
     @staticmethod
     def combine_z_scores(z_scores: List[float], method: str = 'stouffer', weights: List[float] = None) -> float:
         """
-        Combine z-scores using the specified method.
+        Combines a list of z-scores into one via Stouffer's method.
 
-        Parameters:
-        - z_scores (List[float]): List of z-scores to combine.
-        - method (str): Method to combine z-scores. Currently supports 'stouffer'.
-        - weights (List[float], optional): Weights for each z-score. Must be the same length as z_scores.
+        Args:
+            z_scores: list of z-scores.
+            method: only 'stouffer' supported.
+            weights: optional weights; defaults to equal.
 
         Returns:
-        - combined_z (float): The combined z-score.
+            combined_z: float result.
+
+        Raises:
+            ValueError: for non-finite inputs or weight mismatches.
         """
         if method.lower() == 'stouffer':
             if weights is None:
@@ -2713,21 +2912,16 @@ class TCNAnalysis:
         Plots the top N markers for a given cell type using violin plots of z-scores with overlaid scatter plots.
         Markers are separated by hop, and top markers per hop are selected.
 
-        Parameters:
-        - marker_results (dict): Results containing p-values and directions for markers.
-                                 Format: results[combination] = (cell_type_hop_significance, marker_p_values)
-                                 where marker_p_values[(hop, marker_idx, cell_type)] = (direction, p_value).
-        - marker_names (list): List of marker names indexed by marker indices.
-        - cell_type_to_plot (str): The specific cell type to plot.
-        - top_n (int): Number of top markers to plot per hop for responders and non-responders.
-        - significance_threshold (float): Threshold to consider a marker significant.
-                                          (Note: As per instruction, all z-scores are included)
-        - sort_by_difference (bool): Whether to sort markers by difference.
-                                       Currently sorts by combined z-score.
-
+        Args:
+            marker_results: mapping from combination to marker data.
+            marker_names: list of marker names.
+            cell_type_to_plot: which cell type to restrict.
+            top_n: markers per hop.
+            significance_threshold: p-value cutoff.
+            sort_by_difference: unused.
+            
         Returns:
-        - fig_responder (matplotlib.figure.Figure): Figure for responders.
-        - fig_non_responder (matplotlib.figure.Figure): Figure for non-responders.
+            (fig_responder, fig_non_responder): Matplotlib figures.
         """
 
         @staticmethod
@@ -2826,113 +3020,6 @@ class TCNAnalysis:
             for i, marker in enumerate(valid_marker_list):
                 combined_z = combined_z_scores.get(marker, 0)
                 ax2.hlines(combined_z, i + 0.75, i + 1.25, colors=combined_color, linestyles='-', linewidth=2)
-
-            # ------------------ Enhanced Annotation Logic ------------------
-
-            # # Track occupied y-positions per axis to prevent overlap
-            # occupied_positions_ax = defaultdict(list)  # For individual z-scores
-            # occupied_positions_ax2 = defaultdict(list)  # For combined z-scores
-
-            # # Annotate individual extreme z-scores on primary axis
-            # for i, marker in enumerate(valid_marker_list):
-            #     z_scores = marker_z_scores[marker][hop]
-            #     details = marker_details.get(marker, {}).get(hop, [])
-
-            #     # Sort z-scores by absolute value and select top N
-            #     sorted_indices = sorted(range(len(z_scores)), key=lambda idx: abs(z_scores[idx]), reverse=True)
-            #     extreme_indices = sorted_indices[:max_extremes]
-
-                # for idx in extreme_indices:
-                #     if idx < len(details):
-                #         combination_detail = details[idx]
-                #     else:
-                #         combination_detail = "TCN_Unknown"
-
-                #     z_val = z_scores[idx]
-
-                #     # Determine if annotation is eligible based on direction
-                #     if direction == 'Responders' and z_val > 0:
-                #         eligible = True
-                #     elif direction == 'Non Responders' and z_val < 0:
-                #         eligible = True
-                #     else:
-                #         eligible = False
-
-                    # if eligible:
-                    #     # Define offset to prevent overlap
-                    #     existing_offsets = occupied_positions_ax[i + 1]
-                    #     offset_increment = 0.3  # Adjust as needed
-                    #     if direction == 'Responders':
-                    #         # Place annotations above the point
-                    #         y_position = z_val + (offset_increment * (len(existing_offsets) + 1))
-                    #         vertical_alignment = 'bottom'
-                    #         annotation_color = color
-                    #     else:
-                    #         # Place annotations below the point
-                    #         y_position = z_val - (offset_increment * (len(existing_offsets) + 1))
-                    #         vertical_alignment = 'top'
-                    #         annotation_color = color
-
-                    #     # Record the occupied position
-                    #     occupied_positions_ax[i + 1].append(y_position)
-
-                    #     # Add bounding box to text for better visibility
-                    #     bbox_props = dict(boxstyle="round,pad=0.3", fc="white", ec="black", alpha=0.7)
-
-                    #     # Annotate with text
-                    #     ax.text(
-                    #         i + 1,
-                    #         y_position,
-                    #         combination_detail,  # Label with combination detail
-                    #         horizontalalignment='center',
-                    #         verticalalignment=vertical_alignment,
-                    #         fontsize=8,
-                    #         color=annotation_color,
-                    #         rotation=45,
-                    #         bbox=bbox_props
-                    #     )
-
-            # Optionally, annotate combined z-scores on secondary axis
-            # for i, marker in enumerate(valid_marker_list):
-            #     combined_z = combined_z_scores.get(marker, 0)
-            #     if combined_z == 0:
-            #         continue  # Skip if combined z-score is zero
-
-            #     details = marker_details.get(marker, {}).get(hop, [])
-
-            #     # Assuming you have details for combined z-scores, adjust as needed
-            #     combination_detail = f"Combined_{marker}"  # Example label
-
-                # # Define offset to prevent overlap
-                # existing_offsets = occupied_positions_ax2[i + 1]
-                # offset_increment = 0.3  # Adjust as needed
-                # if combined_z > 0:
-                #     y_position = combined_z + (offset_increment * (len(existing_offsets) + 1))
-                #     vertical_alignment = 'bottom'
-                # else:
-                #     y_position = combined_z - (offset_increment * (len(existing_offsets) + 1))
-                #     vertical_alignment = 'top'
-
-                # # Record the occupied position
-                # occupied_positions_ax2[i + 1].append(y_position)
-
-                # # Add bounding box to text for better visibility
-                # bbox_props = dict(boxstyle="round,pad=0.3", fc="white", ec="black", alpha=0.7)
-
-                # # Annotate with text on secondary axis
-                # ax2.text(
-                #     i + 1,
-                #     y_position,
-                #     combination_detail,  # Label with combination detail
-                #     horizontalalignment='center',
-                #     verticalalignment=vertical_alignment,
-                #     fontsize=8,
-                #     color=combined_color,
-                #     rotation=45,
-                #     bbox=bbox_props
-                # )
-
-            # ------------------ End of Enhanced Annotation Logic ------------------
 
             # Set labels and title
             ax.set_xticks(range(1, len(valid_marker_list) + 1))
@@ -3170,6 +3257,16 @@ class TCNAnalysis:
 
     @staticmethod
     def get_group_expr_values(marker_names, marker_expr_results_copy):
+        """
+        Gathers full expression lists by cell type and hop for box/violin plotting.
+
+        Args:
+            marker_names: list of names.
+            marker_expr_results_copy: map combination to expr dict.
+
+        Returns:
+            Tuple of two nested dicts: responder and non-responder expr lists.
+        """
         # Retain the full list of values for box plot distribution
         marker_expr_responder = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         marker_expr_non_responder = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))              
@@ -3188,6 +3285,21 @@ class TCNAnalysis:
  
     @staticmethod
     def get_marker_box_plots(direction, color, include_scatter, ax, responder_expr, non_responder_expr, use_violin_plot=True):
+        """
+        Creates violin or box plots with optional scatter overlays for marker exprs.
+
+        Args:
+            direction: 'Responders' or 'Non Responders'.
+            color: color name for group.
+            include_scatter: whether to show data points.
+            ax: Matplotlib Axes to draw on.
+            responder_expr: list of arrays per marker.
+            non_responder_expr: similarly.
+            use_violin_plot: if False, uses boxplots.
+
+        Returns:
+            None — draws on provided ax.
+        """
         if use_violin_plot:
             # Violin plot for responders and non-responders
             if direction == 'Responders':
@@ -3260,7 +3372,16 @@ class TCNAnalysis:
     @staticmethod
     def build_dataset(responder_markers, non_responder_markers, top_markers):
         """
-        Builds the dataset for classification using the top markers, with debugging to check unique lengths.
+        Builds feature matrix X and label vector y using selected markers.
+
+        Args:
+            responder_markers: map marker->list of expr for responders.
+            non_responder_markers: similarly for non-responders.
+            top_markers: markers to include in dataset.
+
+        Returns:
+            X: 2D array of shape (n_samples, n_markers).
+            y: 1D array of 0/1 labels.
         """
         # Collect unique lengths
         responder_lengths = []
@@ -3313,16 +3434,16 @@ class TCNAnalysis:
     @staticmethod
     def train_and_evaluate_classifier_with_kfold(X, y, n_splits=5):
         """
-        Trains and evaluates a simple logistic regression classifier using K-Fold Cross-Validation.
+        Trains and evaluates a logistic-regression model via KFold CV.
 
-        Parameters:
-        - X (array-like): Feature matrix.
-        - y (array-like): Target labels.
-        - n_splits (int): Number of folds for cross-validation.
+        Args:
+            X: feature matrix.
+            y: target labels.
+            n_splits: number of folds.
 
         Returns:
-        - mean_auc (float): Mean AUC-ROC score across all folds.
-        - std_auc (float): Standard deviation of AUC-ROC scores.
+            mean_auc: mean ROC-AUC across folds.
+            std_auc: standard deviation of ROC-AUC.
         """
         from sklearn.model_selection import KFold
         from sklearn.linear_model import LogisticRegression
@@ -3364,19 +3485,18 @@ class TCNAnalysis:
     @staticmethod
     def classify_ct_with_kfold(marker_names, significance_threshold, marker_results, marker_expr_results, number_of_markers, n_splits=5):
         """
-        Builds the dataset and evaluates the classifier using K-Fold Cross-Validation.
+        Runs end-to-end top-N marker selection and classifier evaluation.
 
-        Parameters:
-        - marker_names (list): List of marker names.
-        - significance_threshold (float): P-value threshold for marker significance.
-        - marker_results (dict): Dictionary of marker results with p-values and directions.
-        - marker_expr_results (dict): Dictionary of marker expression results.
-        - number_of_markers (int): Number of top markers to use as features.
-        - n_splits (int): Number of folds for cross-validation.
+        Args:
+            marker_names: all marker names.
+            significance_threshold: p-value cutoff.
+            marker_results: mapping for p-values/directions.
+            marker_expr_results: expression data.
+            number_of_markers: top-N features to use.
+            n_splits: CV folds.
 
         Returns:
-        - mean_auc (float): Mean AUC-ROC score across folds.
-        - std_auc (float): Standard deviation of AUC-ROC scores.
+            mean_auc, std_auc as in train_and_evaluate_classifier.
         """
         # Deep copy of the results to avoid modifying the original data
         marker_results_copy = copy.deepcopy(marker_results)
@@ -3401,6 +3521,21 @@ class TCNAnalysis:
     
     @staticmethod
     def get_comb_markers_dict_and_expr_per_marker(marker_names, significance_threshold, marker_results_copy, marker_expr_results_copy):
+        """
+        Combines p-values and aggregates expression for each marker across combinations.
+
+        Args:
+            marker_names: list of names.
+            significance_threshold: p cutoff.
+            marker_results_copy: mapping for p-values.
+            marker_expr_results_copy: mapping for expr data.
+
+        Returns:
+            Tuple:
+                responder_expr: cell_type->marker->list
+                non_responder_expr: same
+                combined_marker_results: cell_type->marker->{'z','p'}
+        """
         marker_significance = defaultdict(lambda: defaultdict(lambda: {'p_values': [], 'directions': []}))
         marker_expression_responder = defaultdict(lambda: defaultdict(list))
         marker_expression_non_responder = defaultdict(lambda: defaultdict(list))

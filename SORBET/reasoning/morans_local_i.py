@@ -10,6 +10,10 @@ from tqdm import tqdm as tqdm
 def calculate_weight_matrices(graph_lens: Dict[str, Dict[int, Dict[int, int]]], shell_size: int = 3, progressbar: bool = False) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
     """Computes the weight matrix w_{ij} between all pairs of nodes in graphs.
 
+    The weight of cells i and j are:
+        w_{i,j} = 1 if d(i,j) <= shell_size
+        w_{i,j} = 0 if d(i,j) > shell_size
+
     Args:
         graph_lens: dictionary mapping each graph to a pairwise distance matrix (of the form output by networkx pairwise distances).
             Each distance matrix is encoded as a dictionary (source node) -> (target node) -> (distance) 
@@ -42,6 +46,8 @@ def _estimate_pvalues(nums, dist):
 def calculate_local_morans_i(marker: str, expression_data: pd.DataFrame, weight_matrices: Dict[str, np.ndarray], 
         nperms=10, progressbar=False) -> Tuple[str, List[Tuple[Any]]]:
     """Computes the local Moran's i for a single instance of a marker.
+    
+    TODO: Include definition of Moran's local i in docstring.
 
     Args:
         marker: string of the marker to evaluate
@@ -110,6 +116,6 @@ def parallelize_moran_i_local(markers_list: List[str], expression_data: pd.DataF
     
     partial_moran_i = partial(calculate_local_morans_i, expression_data = expression_data, weight_matrices = weight_matrices, nperms = nperms, progressbar = False)
 
-    with mp.Pool(16) as p:
+    with mp.Pool(nprocs) as p:
         for marker, statistics in tqdm(p.imap_unordered(partial_moran_i, markers_list), total=len(markers_list), disable=(not progressbar), desc="Marker Computation"):
             yield marker, statistics

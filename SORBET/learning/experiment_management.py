@@ -29,7 +29,8 @@ _perf_dname = "perf"
 _plots_dname = "plots"
 
 def create_data_split_record(split: List[Tuple[list]], output_directory: str) -> Tuple[List[Tuple[list]], ExperimentRecord]:
-    """Creates a new directory with a pre-defined structure for saving SORBET experiments on a specific data split.
+    """Creates a new directory recording a data split. 
+    The created directory has a pre-defined structure for saving SORBET experiments on a specific data split.
 
     Args:
         split: data split for the chosen analysis
@@ -54,8 +55,8 @@ def create_data_split_record(split: List[Tuple[list]], output_directory: str) ->
     return split, record 
 
 def load_data_split_record(directory: str):
-    """Loads a previously dumped data split from a pre-specified directory structure. 
-    NOTE: Called after create_data_split_record.
+    """Loads a previously dumped data split, created using create_data_split_record 
+    Useful for re-loading a saved data split after restarting a notebook / code. 
 
     Args:
         directory: the filepath where the previously saved record was created

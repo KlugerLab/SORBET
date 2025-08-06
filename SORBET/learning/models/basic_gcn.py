@@ -25,11 +25,12 @@ _BasicGCNSpecification = StructureSpecification(
 
 class GCNStandardSupervised(BaseGraphModel):
     """GCN model with the following structure:
-        - GCN Conv Layers (`conv_channels`)
-        - Pooling Layer (default: global_mean)
-        - Linear Layers (`out_channels`)
+        - GCN Conv Layers (`conv_channels`): Layer widths for convolutional layers
+        - Pooling Layer (default: global_mean): choice of pooling function. See parse_pooling_function in _utils.py for options.
+        - Linear Layers (`out_channels`): Layer widths for output fully-connected neural network for processing node representations.
+
+    NOTE: The corresponding initialization argument is placed in parenthesis.
     """
- 
     def __init__(self, 
             in_channel: int,
             conv_channels: List[int],
@@ -131,7 +132,6 @@ class GCNStandardSupervised(BaseGraphModel):
         """See base.py for specification
         """
         # Pools over all cell embeddings
-        # TODO: Input currently after cell embedding. Should cell embedding be integrated into the function?
         return self.pooler(x, batch)
 
     @staticmethod

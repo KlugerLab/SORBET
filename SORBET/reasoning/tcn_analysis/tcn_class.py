@@ -8,21 +8,48 @@ class TCN:
     """
     A class to represent a single or ensemble of Typed Cell Niches (TCNs).
 
+    Args:
+        run_id: List of run identifiers.
+        fov_id: List of field of view identifiers.
+        tcn_arr: Array representing the TCNs, shape (n_hops, n_cell_types).
+        label: List of labels corresponding to each TCN (0/1).
+        center_cell_index: List of indices of the center cell for each TCN.
+        cell_type_indexing: Mapping from cell type name to column index.
+        binary_tcn_arr: Optional binary indicator array; if None, derived from `tcn_arr`.
+        marker_tcn_arr: Optional marker-specific TCN array, same shape as `tcn_arr`.
+        cell_type_indeces_dict: Optional dict mapping each cell type to a dict of
+            hop→list of cell indices.
+
     Attributes:
-    run_id : List[int]
-        List of run identifiers.
-    fov_id : List[int]
-        List of field of view identifiers.
-    tcn_arr : np.ndarray
-        Array representing the TCNs.
-    label : List[int]
-        List of labels corresponding to the TCNs.
-    center_cell_index : int
-    cell_type_indexing : Dict[str, int]
-        Indexing of cell types.
+        run_id: List[int] — run identifiers.
+        fov_id: List[int] — field of view identifiers.
+        tcn_arr: np.ndarray — numeric TCN array.
+        binary_tcn_arr: np.ndarray — binary TCN array.
+        marker_tcn_arr: Optional[np.ndarray] — marker TCN array.
+        label: List[int] — responder labels.
+        center_cell_index: List[int] — center‐cell indices.
+        cell_type_indexing: Dict[str, int] — cell type → column idx.
+        cell_type_indeces_dict: Optional[Dict[str, Dict[int, List[int]]]].
+        avrage_nei_sizes: Optional[np.ndarray] — average neighborhood sizes override.
     """
 
     def __init__(self, run_id: List[int], fov_id: List[int], tcn_arr: np.ndarray, label: List[int], center_cell_index: List[int], cell_type_indexing: Dict[str, int], binary_tcn_arr: None| np.ndarray = None,  marker_tcn_arr: None| np.ndarray = None, cell_type_indeces_dict: Dict[str, Dict[int, List[int]]] = None):
+        """
+        Initializes a TCN object, deriving binary_tcn_arr from `tcn_arr` if not provided.
+
+        Args:
+            run_id: List[int] — run identifiers.
+            fov_id: List[int] — field of view identifiers.
+            tcn_arr: np.ndarray — array of TCN values.
+            label: List[int] — responder labels (0 or 1).
+            center_cell_index: List[int] — indices of the center cell per TCN.
+            cell_type_indexing: Dict[str, int] — mapping cell type → tcn_arr column.
+            binary_tcn_arr: Optional[np.ndarray] — binary version of `tcn_arr`.
+            marker_tcn_arr: Optional[np.ndarray] — marker-specific array.
+            cell_type_indeces_dict: Optional[Dict[str, Dict[int, List[int]]]] — 
+                per‐cell‐type hop‐index mapping.
+
+        """
         self.run_id = run_id
         self.fov_id = fov_id
         self.tcn_arr = tcn_arr
@@ -39,15 +66,16 @@ class TCN:
 
     def __add__(self, other: 'TCN') -> 'TCN':
         """
-        Adds two TCN objects if they have the same shape.
+        Adds two TCN objects element‐wise, concatenating metadata lists.
 
-        Parameters:
-        other : TCN
-            Another TCN object.
+        Args:
+            other: TCN — another TCN object with identical `tcn_arr` shape.
 
         Returns:
-        TCN
-            A new TCN object with combined attributes.
+            TCN — new object with summed arrays and concatenated lists.
+
+        Raises:
+            ValueError: if `self.tcn_arr.shape != other.tcn_arr.shape`.
         """
         if self.tcn_arr.shape != other.tcn_arr.shape:
             raise ValueError("TCN arrays must have the same shape to be added.")
@@ -70,15 +98,16 @@ class TCN:
 
     def __sub__(self, other: 'TCN') -> 'TCN':
         """
-        Subtracts another TCN object if they have the same shape.
+        Subtracts another TCN object element‐wise, concatenating metadata lists.
 
-        Parameters:
-        other : TCN
-            Another TCN object.
+        Args:
+            other: TCN — another TCN object with identical `tcn_arr` shape.
 
         Returns:
-        TCN
-            A new TCN object with subtracted attributes.
+            TCN — new object with subtracted arrays and concatenated lists.
+
+        Raises:
+            ValueError: if `self.tcn_arr.shape != other.tcn_arr.shape`.
         """
         if self.tcn_arr.shape != other.tcn_arr.shape:
             raise ValueError("TCN arrays must have the same shape to be subtracted.")
@@ -101,15 +130,16 @@ class TCN:
 
     def get_cell_type_subset_representation(self, cell_types: List[str]) -> np.ndarray:
         """
-        Returns a the tcn array representation using subset of the cell types.
+        Returns the numeric TCN array restricted to a subset of cell types.
 
-        Parameters:
-        cell_types : List[str]
-            List of cell types to include.
+        Args:
+            cell_types: List[str] — cell type names to include.
 
         Returns:
-        np.ndarray
-            The subset of the tcn array.
+            np.ndarray — shape (n_hops, len(cell_types)) subset of `tcn_arr`.
+
+        Raises:
+            KeyError: if any `cell_type` is not in `cell_type_indexing`.
         """
         indices = [self.cell_type_indexing[ct] for ct in cell_types]
         tcn_arr_subset = self.tcn_arr[:, indices]
@@ -117,15 +147,16 @@ class TCN:
     
     def get_cell_type_subset_binary_representation(self, cell_types: List[str]) -> np.ndarray:
         """
-        Returns a the binary tcn array representation using subset of the cell types.
+        Returns the binary TCN array restricted to a subset of cell types.
 
-        Parameters:
-        cell_types : List[str]
-            List of cell types to include.
+        Args:
+            cell_types: List[str] — cell type names to include.
 
         Returns:
-        np.ndarray
-            The subset of the binary tcn array.
+            np.ndarray — shape (n_hops, len(cell_types)) subset of `binary_tcn_arr`.
+
+        Raises:
+            KeyError: if any `cell_type` is not in `cell_type_indexing`.
         """
         indices = [self.cell_type_indexing[ct] for ct in cell_types]
         binary_tcn_arr_subset = self.binary_tcn_arr[:, indices]
@@ -134,15 +165,13 @@ class TCN:
     @staticmethod
     def normalze_tcn_arr(tcn_arr: np.ndarray) -> np.ndarray:
         """
-        Returns a normalized tcn array.
+        Row‐normalizes a TCN array so each row sums to 1 (zero‐sum rows left unchanged).
 
-        Parameters:
-        tcn_arr : np.ndarray
-            The tcn array to normalize.
+        Args:
+            tcn_arr: np.ndarray — input array, shape (n_hops, n_cell_types).
 
         Returns:
-        np.ndarray
-            The normalized tcn array.
+            np.ndarray — row‐normalized array, same shape as input.
         """
         row_sums = tcn_arr.sum(axis=1)
         row_sums[row_sums == 0] = 1
@@ -152,23 +181,20 @@ class TCN:
 
     def get_normed_representation(self) -> np.ndarray:
         """
-        Returns a normalized representation of the TCN array.
+        Returns a row-normalized representation of the TCN array.
 
         Returns:
-        np.ndarray
-            The normalized TCN array.
+            np.ndarray — the normalized TCN array where each row sums to 1.
         """
         return self.normalze_tcn_arr(self.tcn_arr)
     
     def get_mean_representation(self) -> np.ndarray:
         """
-        Returns the mean representation of the TCN array.
-        The mean representation is the sum of the TCN array divided by the number of runs.
-        If the average neighborhood sizes are set, the mean representation is divided by the average neighborhood sizes.
+        Returns the mean representation of the TCN array over runs,
+        optionally adjusted by average neighborhood sizes.
 
         Returns:
-        np.ndarray
-            The mean representation of the TCN array.
+            np.ndarray — mean TCN array, shape (n_hops, n_cell_types).
         """
         mean_rep = self.tcn_arr / len(self.run_id)
         if self.avrage_nei_sizes is not None:
@@ -177,26 +203,28 @@ class TCN:
     
     def get_mean_binary_representation(self) -> np.ndarray:
         """
-        Returns the mean binary representation of the TCN array.
+        Returns the mean binary representation of the TCN array over runs.
 
         Returns:
-        np.ndarray
-            The mean binary representation of the TCN array.
+            np.ndarray — mean binary TCN array, values in [0, 1].
         """
         return self.binary_tcn_arr / len(self.run_id)
     
 
     def get_remap_cell_types_tcn_object(self, meta_group_mapping: Dict[str, None | str]) -> 'TCN':
         """
-        Aggregates cell types according to meta groups.
+        Aggregates and remaps cell types according to provided meta-group mapping.
 
-        Parameters:
-        meta_group_mapping : Dict[str, str]
-            Mapping of original cell types to meta groups.
-            if None, removes the cell type.
+        Args:
+            meta_group_mapping: Dict[str, Optional[str]] —
+                mapping from original cell type to new meta-group;
+                if value is None, that cell type is removed.
+
         Returns:
-        TCN
-            A new TCN object with aggregated cell types.
+            TCN — new object with aggregated and remapped cell types.
+
+        Raises:
+            ValueError: if all cell types are mapped to None, leaving no groups.
         """
         # check that not all cell types are removed
         if all([v is None for v in meta_group_mapping.values()]):
@@ -221,30 +249,29 @@ class TCN:
 
     def is_homogenous_tcn_in_type(self, cell_types: List[str]) -> bool:
         """
-        Returns whether the TCN is homogenous in the input cell types.
+        Checks if the TCN contains only the specified cell types.
 
-        Parameters:
-        cell_types : List[str]
-            The cell types to check.
+        Args:
+            cell_types: List[str] — cell types to check for homogeneity.
 
         Returns:
-        bool
-            Whether the TCN is comprised only of the input cell types.
+            bool — True if all other cell-type columns are zero.
         """
         indices_not_included = [self.cell_type_indexing[ct] for ct in self.cell_type_indexing.keys() if ct not in cell_types]
         return np.all(self.tcn_arr[:, indices_not_included] == 0)
         
     def plot_pie_chart(self, cell_types_to_plot: List[str], hops_to_plot: int = 0, type: str = 'normed') -> None:
         """
-        Plots a pie chart of the cell types.
+        Plots a pie chart of the specified cell types at a given hop.
 
-        Parameters:
-        hops_to_plot : int
-            The hop to plot.
-        cell_types_to_plot : List[str]
-            The cell types to plot.
-        type : str, optional
-            The type of pie chart to plot, by default 'normed'. can be 'normed' or 'raw', 'mean', 'mean_binary'
+        Args:
+            cell_types_to_plot: List[str] — names of cell types to include.
+            hops_to_plot: int — hop index to plot (row of the array).
+            type: str — representation mode; one of
+                'normed', 'raw', 'mean', 'mean_binary'.
+
+        Raises:
+            ValueError: if `type` is not one of the allowed modes.
         """
         indices_to_plot = [self.cell_type_indexing[ct] for ct in cell_types_to_plot]
         tcn = self._get_representation_by_type(type)
@@ -259,26 +286,23 @@ class TCN:
 
     def is_tcn_center_cell_in_types(self, cell_types: List[str]) -> bool:
         """
-        Returns whether the center cell is in the input cell types.
+        Checks if the center cell belongs to any of the specified cell types.
 
-        Parameters:
-        cell_types : List[str]
-            The cell types to check.
+        Args:
+            cell_types: List[str] — cell types to check.
 
         Returns:
-        bool
-            Whether the center cell is in the input cell types.
+            bool — True if the center cell has a positive value in any of those types.
         """
         center_indices = [self.cell_type_indexing[ct] for ct in cell_types]
         return np.any(self.tcn_arr[0, center_indices] > 0)
         
     def _get_patient_labels(self) -> Dict[Tuple[int, int], int]:
         """
-        Returns the patient labels.
+        Retrieves the unique patient labels based on (run_id, fov_id).
 
         Returns:
-        Dict[Tuple[int, int], int]
-            The patient labels.
+            Dict[Tuple[int, int], int] — mapping from (run_id, fov_id) to label.
         """
         run_id_fov_id = list(zip(self.run_id, self.fov_id))
         unique_indices = np.unique(run_id_fov_id, axis=0, return_index=True)[1]
@@ -291,8 +315,7 @@ class TCN:
         Returns a histogram of how many responders and non-responders correspond to the TCN object.
 
         Returns:
-        Tuple[int, int]
-            The number of responders and non-responders.
+            Tuple[int, int] — (n_responders, n_non_responders).
         """
         patient_labels = self._get_patient_labels()
         unique_labels = np.array(list(patient_labels.values()))
@@ -300,17 +323,16 @@ class TCN:
 
     def get_center_cells_histogram_numbers(self) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Returns a histogram of responder cells and non-responder cells.
+        Counts how many center cells are responders vs non-responders.
 
         Returns:
-        Tuple[np.ndarray, np.ndarray]
-            The histograms of responder cells and non-responder cells.
+            Tuple[int, int] — (n_responder_cells, n_non_responder_cells).
         """
         return np.sum(self.label), len(self.label) - np.sum(self.label)
             
     def plot_center_cells_histogram(self) -> None:
         """
-        Plots a histogram of responder cells and non-responder cells.
+        Plots a bar chart of responder vs non-responder center cells.
         """
         responder_cells, non_responder_cells = self.get_center_cells_histogram_numbers()
         plt.bar(["Responders", "Non-Responders"], [responder_cells, non_responder_cells], color=['#F5A9A9', '#A9D0F5'])
@@ -319,15 +341,19 @@ class TCN:
 
     def get_idws_histogram(self, idws_scores: Dict[Tuple[int, int], Dict[int, float]], pos_thresh: float = 0.5, neg_thersh: float = -0.5) -> np.ndarray:
         """
-        Returns a binarized histogram of IDWS scores of the cells.
+        Binarizes IDWS scores and counts responders vs non-responders.
 
-        Parameters:
-        idws_scores : Dict[int, float]
-            The IDWS scores.
+        Args:
+            idws_scores: mapping from (run_id, fov_id) to per-cell scores.
+            pos_thresh: float — scores above this count as responder.
+            neg_thersh: float — scores below this count as non-responder.
 
         Returns:
-        np.ndarray
-            The binarized histogram of IDWS scores.
+            Tuple[int, int] — (n_responder_cells, n_non_responder_cells).
+
+        Raises:
+            AssertionError: if pos_thresh <= neg_thersh.
+            KeyError: if (run_id, fov_id) or cell index is missing in idws_scores.
         """
         assert pos_thresh > neg_thersh
         responder_cells = 0
@@ -342,15 +368,12 @@ class TCN:
     
     def plot_idws_histogram(self, idws_scores: Dict[int, float], pos_thresh: float = 0.5, neg_thersh: float = -0.5) -> None:
         """
-        Plots a histogram of IDWS scores of the cells.
+        Plots a bar chart of responder vs non-responder cells based on IDWS scores.
 
-        Parameters:
-        idws_scores : Dict[int, float]
-            The IDWS scores.
-        pos_thresh : float, optional
-            The positive threshold, by default 0.5.
-        neg_thersh : float, optional
-            The negative threshold, by default -0.5.
+        Args:
+            idws_scores: mapping from (run_id, fov_id) to per-cell scores.
+            pos_thresh: float — positive threshold (default 0.5).
+            neg_thersh: float — negative threshold (default -0.5).
         """
         responder_cells, non_responder_cells = self.get_idws_histogram(idws_scores, pos_thresh, neg_thersh)
         plt.bar(["Responders", "Non-Responders"], [responder_cells, non_responder_cells], color=['red', 'blue'])
@@ -359,15 +382,16 @@ class TCN:
 
     def plot_tcn_heatmap(self, cell_types_to_remove: None | List[str] = None, remove_center: bool = True, type: str = 'normed') -> None:
         """
-        Plots the TCN heatmap.
+        Displays a heatmap of the TCN representation.
 
-        Parameters:
-        remove_center : bool, optional
-            Whether to remove the center cell, by default True.
-        cell_types_to_remove : None | List[str], optional
-            The cell types to remove from the heatmap, by default None.
-        type : str, optional
-            The type of heatmap to plot, by default 'normed'. can be 'normed' or 'raw' or 'mean', `mean_binary`
+        Args:
+            cell_types_to_remove: Optional[List[str]] — names to exclude.
+            remove_center: bool — if True, omit the center cell row.
+            type: str — representation mode; one of
+                'normed', 'raw', 'mean', 'mean_binary'.
+
+        Raises:
+            ValueError: if `type` is not one of the allowed modes.
         """
         fig, ax = plt.subplots()  
 
@@ -405,15 +429,16 @@ class TCN:
 
     def _get_representation_by_type(self, type: str) -> np.ndarray:
         """
-        Returns the representation of the TCN by type.
+        Retrieves a TCN array representation based on the specified mode.
 
-        Parameters:
-        type : str
-            The type of representation to return.
+        Args:
+            type: str — one of 'normed', 'raw', 'mean', 'mean_binary'.
 
         Returns:
-        np.ndarray
-            The representation of the TCN.
+            np.ndarray — the corresponding TCN array.
+
+        Raises:
+            ValueError: if `type` is not recognized.
         """
         if type == 'normed':
             return self.get_normed_representation()
@@ -428,7 +453,7 @@ class TCN:
 
     def plot_patient_histograms(self):
         """
-        Plots the histograms of the patients.
+        Plots responder vs non-responder patient counts as a bar chart.
         """
         responders, non_responders = self.get_patient_histogram_numbers()
         plt.bar(["Responders", "Non-Responders"], [responders, non_responders], color=['#F5A9A9', '#A9D0F5']) 
@@ -437,11 +462,10 @@ class TCN:
 
     def get_patients_counts(self) -> Dict[Tuple[int, int], int]:
         """
-        Returns the number of tcns assosiated with each patinet.
+        Counts the number of TCNs associated with each patient.
 
         Returns:
-        Dict[Tuple[int, int], int]
-            The number of tcns assosiated with each patinet.
+            Dict[Tuple[int, int], int] — mapping (run_id, fov_id) → count of TCNs.
         """
         run_id_fov_id = list(zip(self.run_id, self.fov_id))
         patient_counts = dict()
@@ -451,7 +475,12 @@ class TCN:
     
     def plot_patient_counts_with_labels(self, title: str = "Number of TCNs Assosiated with Each Patient", enumarate_patients: bool = True):
         """
-        Plots a bar plot of the number of TCNs assosiated with each patient.
+        Plots TCN counts per patient, colored by responder status.
+
+        Args:
+            title: str — chart title.
+            enumarate_patients: bool — if True, use numeric indices on x-axis,
+                else use (run_id, fov_id) tuples.
         """
         patient_counts = self.get_patients_counts()
         patient_labels = self._get_patient_labels()
@@ -468,31 +497,29 @@ class TCN:
 
     def get_binary_representation(self) -> np.ndarray:
         """
-        Returns a binary representation of the TCN array.
+        Returns a binary indicator array of the TCN values (>0).
 
         Returns:
-        np.ndarray
-            The binary representation of the TCN array.
+            np.ndarray — binary TCN array, same shape as `tcn_arr`.
         """
         return (self.tcn_arr > 0).astype(int)
     
     def set_avarage_neighborhood_sizeS(self, avrage_nei_sizes: np.ndarray) -> None:
         """
-        Sets the average neighborhood sizes.
+        Sets an override for average neighborhood sizes, used by `get_mean_representation`.
 
-        Parameters:
-        avrage_nei_sizes : np.ndarray
-            The average neighborhood sizes.
+        Args:
+            avrage_nei_sizes: np.ndarray — array of length n_hops,
+                average neighborhood sizes per hop.
         """
         self.avrage_nei_sizes = avrage_nei_sizes
 
     def get_avarage_neighborhood_sizes(self) -> np.ndarray:
         """
-        Returns the average neighborhood sizes.
+        Retrieves or computes average neighborhood sizes per hop.
 
         Returns:
-        np.ndarray
-            The average neighborhood sizes.
+            np.ndarray — array of length n_hops with average sizes.
         """
         if self.avrage_nei_sizes is None:
             total_num_of_cells = np.sum(self.tcn_arr, axis=1)

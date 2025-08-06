@@ -1,4 +1,4 @@
-"""A helper method for computing the k-fold evaluation on a series of lambdas. 
+"""This file implements a helper method for computing the k-fold evaluation on a series of lambdas. 
 Useful for estimating the appropriate regularization.
 """
 from typing import Optional, List, Dict, Tuple, Iterable
@@ -80,25 +80,6 @@ def sparse_cca_kfold_cv(X1: np.ndarray, X2: np.ndarray, lambdaxs: List[float], l
 
     best_reg = max(estimated_correlations.keys(), key=lambda t: estimated_correlations[t])
     return best_reg, estimated_correlations, l0_norms
-
-def _train_test_iterator(X1: np.ndarray, X2: np.ndarray, idx_groups: List[Tuple[List[int], List[int]]]
-        ) -> Iterable[Tuple[Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray]]]:
-    """Splits two datasets over train and test splits
-    
-    TODO: Remove. Not currently used.
-
-    Args:
-        X1, X2: datasets for fitting sparse CCA models. Share first dimensions.
-        idx_groups: a list of train / test indices to split X1 and X2 
-    
-    Returns:
-        An iterable of two tuples encoding the X1 / X2 train and test tuples, respectively.
-    """
-    for train_idxes, test_idxes in idx_groups:
-        X1train, X2train = X1[:,train_idxes], X2[:,train_idxes]
-        X1test, X2test = X1[:,test_idxes], X2[:,test_idxes]
-
-        yield (X1train, X2train), (X1test, X2test) 
 
 def plot_kfold_regularization(correlations: Optional[dict] = None, norms: Optional[dict] = None, 
         figscale: int = 7, fpath: Optional[str] = None) -> plt.figure: 

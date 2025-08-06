@@ -160,6 +160,9 @@ def _is_logscale(data: np.ndarray, log_thr: float = 2):
     """Helper function to understand if hyperparameter has a log-like structure.
     Rough estimate; not always correct.
 
+    NOTE: If this fails, the appropriate axis can still be set manually (e.g., ax.set_xscale('log') for the relevant axis).
+    Scale may be inappropriate otheriwse. 
+
     Args:
         data: a numpy array with the sampled hyperparameters
         log_thr: the number of log changes necessary to call a data range log-like

@@ -13,6 +13,9 @@ from torch_geometric.loader import DataLoader
 from ..data_handling import load_omicsgraph
 from ..learning import GCNSorbetBase 
 
+# TODO: load_model_cell_embeddings and load_model_subgraph_embeddings currently compute embeddings and load them.
+# This is somewhat of a misnomer. Consider converting name to a different choice (e.g., compute_[x])
+
 def load_model_cell_embeddings(model: GCNSorbetBase, dataset: Dataset, data_dir: str, ofpath: str = None, 
         device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"), 
         batch_size: int = 128) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

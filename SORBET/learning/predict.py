@@ -70,10 +70,10 @@ def predict_subgraphs(input_dirpath: str, root_fpath: str, metadata_files: str, 
 def export_split_subgraph_predictions(input_dirpath: str, split_idx: int,
         labels: np.ndarray, predictions: np.ndarray, test_dataset: TorchOmicsDataset,
         output_fname: str = _output_combined_subgraph_fname):
-    """Output computed predictions for a specific subgraph to a file. 
-    Can be used iteratively in place of predict_subgraphs (e.g., from Jupyter notebook).
-
-    n.b. train_model outputs the info re-computed in predict_subgraphs. This function erases any need to compute a second time.
+    """Output computed predictions for a specific data split to a file. 
+    
+    This function is in place because train_model (in train.py) returns labels / predictions.
+    This function can save those predictions, rather than re-computing predictions / labels using predict_subgraphs
 
     Args:
         input_dirpath: data dirpath of a single data split
@@ -101,11 +101,12 @@ def export_split_subgraph_predictions(input_dirpath: str, split_idx: int,
 
 def load_subgraph_predictions(input_dirpath: str, subgraph_fname: str = _output_combined_subgraph_fname
         ) -> List[Tuple[int, float, str, str, str]]:
-    """Load previously computed subgraph predictions saved at a chosen location
+    """Load previously computed subgraph predictions. Must run predict_subgraphs prior to this function.  
+    Useful to not recompute subgraph predictions multiple times.
 
     Args:
         input_dirpath: data dirpath of a single data split
-        output_fname: output filename for predictions
+        subgraph_fname: location of previously saved subgraph predictions 
     
     Returns:
         A list of tuples of form (label, prediction, subgraph ID, tissue ID, file name)
@@ -146,6 +147,7 @@ def _process_subgraph_ids(fpaths, sg_pattern: str = "_sg_(\d+)") -> List[Tuple[s
 
     return subgraph_descriptors 
 
+# TODO: Use consistent style for global variables (convert to CAPITALS).
 _strategies = {
             "median": np.median,
             "mean": np.mean,
@@ -209,12 +211,14 @@ def predict_graphs(input_dirpath: str, combination_strategy: str,
 
     return combined_data 
 
+# again not clear why you need an output file
 def load_graph_predictions(input_dirpath: str, tissue_fname: str = _output_combined_graph_fname) -> List[Tuple[int, float, str]]:
-    """Load previously computed graph predictions
+    """Load previously computed graph predictions. Must run predict_graphs prior to this function.
+    Useful to not recompute subgraph predictions multiple times.
 
     Args:
         input_dirpath: data dirpath of a single data split
-        tissues_fname: filename for graph predictions (output)
+        tissues_fname: filename containing previously computed graph predictions. 
 
     Returns:
         A list of tuples of form (label, prediction, tissue ID)

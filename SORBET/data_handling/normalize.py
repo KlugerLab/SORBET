@@ -75,6 +75,7 @@ def normalize_dataset(tissue_graphs: List[OmicsGraph], normalize_method: str, no
         sample_normed_data = normed_data[sidx:eidx]
         tissue_graph.set_node_data(sample_normed_data)
 
+# TODO: Remove normalize_method argument from _normalize_[x] sub-routines. Argument not used by methods.
 def _normalize_by_total_count(data: np.ndarray, normalize_method: str, normalize_total_args: dict = dict()) -> np.ndarray:
     """Normalize each cell by total count. Wraps scanpy.pp.normalize_total
 
@@ -108,6 +109,8 @@ def _normalize_by_total_count(data: np.ndarray, normalize_method: str, normalize
 
 def _normalize_by_log(data: np.ndarray, normalize_method: str, normalize_log_args: dict = dict(), pseudocount: float = 1.0):
     """Normalize each cell by log(x+p). Wraps scanpy.pp.log1p, with an option for rescaling to total normalization
+    
+    NOTE: Can also normalize by log prior to counts normalization. See normalize_method passed to _normalize_by_total_count
 
     Args:
         data: node data as a NumPy array
@@ -190,6 +193,7 @@ def _normalize_to_range(data: np.ndarray, normalize_method: str):
     mi, ma = np.min(data, axis=0), np.max(data, axis=0)
     return (data - mi) / (ma - mi)
 
+# TODO: Use consistent style for global variables (convert to CAPITALS).  
 normalization_method_fns = {
         'total_count': _normalize_by_total_count,
         'log_normalize': _normalize_by_log,
@@ -197,32 +201,3 @@ normalization_method_fns = {
         'z-normalize': _normalize_by_variance,
         'to-range': _normalize_to_range
         }
-
-def normalize_graphs_by_pca(tissue_graphs: List[OmicsGraph], pca_args: dict = dict()):
-    """Deprecated: To remove on future versions.
-    """
-
-    combined_data = list()
-    offsets, cidx = [0], 0
-    
-    for graph in tissue_graphs:
-        graph_data = graph.get_node_data()
-        combined_data.append(graph_data)
-
-        cidx += graph_data.shape[0]
-        offsets.append(cidx)
-    
-    combined_data = np.vstack(combined_data)
-    adata = AnnData(combined_data)
-
-    default_args = {}
-    default_args.update(pca_args)
-    default_args['copy'] = True
-
-    pca_results = sc.pp.pca(adata, **default_args)
-    pca_data = pca_results.obsm['X_pca']
-    
-    mupd = ['PC {idx}' for idx in range(pca_data.shape[1])]
-    for sidx, eidx, tissue_graph in zip(offsets, offsets[1:], tissue_graphs):
-        normed_data = pca_data[sidx:eidx]
-        tissue_graph.set_node_data(normed_data, marker_update = mupd) 
