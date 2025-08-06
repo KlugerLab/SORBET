@@ -53,7 +53,7 @@ def normalize_dataset(tissue_graphs: List[OmicsGraph], normalize_method: str, no
         normalize_method: the chosen method to normalize a graph
         normalize_args: dictionary including additional arguments, specific to each method.
     """
-    assert normalize_method in 
+    assert normalize_method in normalization_method_fns
 
     # Serialize data into single matrix:
     data, data_indices = list(), list()
@@ -68,14 +68,14 @@ def normalize_dataset(tissue_graphs: List[OmicsGraph], normalize_method: str, no
         data.append(graph_data)
     
     data = np.vstack(data)
-    normed_data = [normalize_method](data, normalize_method, **normalize_args)
+    normed_data = normalization_method_fns[normalize_method](data, normalize_method, **normalize_args)
     
     # De-serialize data matrix:
     for tissue_graph, (sidx, eidx) in zip(tissue_graphs, data_indices):
         sample_normed_data = normed_data[sidx:eidx]
         tissue_graph.set_node_data(sample_normed_data)
 
-def _normalize_by_total_count(data: np.ndarray, normalize_method: str, normalize_total_args: dict = dict()) -> np.ndarray: # Not critical: but this is the only place normalize_method in the inner functions is used, can just be in the dict. Also you use another func for normalization
+def _normalize_by_total_count(data: np.ndarray, normalize_method: str, normalize_total_args: dict = dict()) -> np.ndarray:
     """Normalize each cell by total count. Wraps scanpy.pp.normalize_total
 
     Args:
@@ -106,7 +106,7 @@ def _normalize_by_total_count(data: np.ndarray, normalize_method: str, normalize
     normed_data = sc.pp.normalize_total(adata, **default_args)['X']
     return normed_data
 
-def _normalize_by_log(data: np.ndarray, normalize_method: str, normalize_log_args: dict = dict(), pseudocount: float = 1.0): # If you have this implemented in the total count why do you need this function (which is the one being used)
+def _normalize_by_log(data: np.ndarray, normalize_method: str, normalize_log_args: dict = dict(), pseudocount: float = 1.0):
     """Normalize each cell by log(x+p). Wraps scanpy.pp.log1p, with an option for rescaling to total normalization
 
     Args:
@@ -198,3 +198,32 @@ normalization_method_fns = {
         'z-normalize': _normalize_by_variance,
         'to-range': _normalize_to_range
         }
+
+def normalize_graphs_by_pca(tissue_graphs: List[OmicsGraph], pca_args: dict = dict()):
+    """Deprecated: To remove on future versions.
+    """
+
+    combined_data = list()
+    offsets, cidx = [0], 0
+    
+    for graph in tissue_graphs:
+        graph_data = graph.get_node_data()
+        combined_data.append(graph_data)
+
+        cidx += graph_data.shape[0]
+        offsets.append(cidx)
+    
+    combined_data = np.vstack(combined_data)
+    adata = AnnData(combined_data)
+
+    default_args = {}
+    default_args.update(pca_args)
+    default_args['copy'] = True
+
+    pca_results = sc.pp.pca(adata, **default_args)
+    pca_data = pca_results.obsm['X_pca']
+    
+    mupd = ['PC {idx}' for idx in range(pca_data.shape[1])]
+    for sidx, eidx, tissue_graph in zip(offsets, offsets[1:], tissue_graphs):
+        normed_data = pca_data[sidx:eidx]
+        tissue_graph.set_node_data(normed_data, marker_update = mupd) 
