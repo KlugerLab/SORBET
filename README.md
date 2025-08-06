@@ -19,12 +19,3 @@ For additional information, please reference our pre-print:
 > Shay Shimonov, Joseph M Cunningham, Ronen Talmon, Lilach Aizenbud, Shruti J Desai, David Rimm, Kurt Schalper, Harriet Kluger, Yuval Kluger 
 >
 > _bioRxiv_ 2024 January 3. doi: []()
->
-
-## Get Started 
-### Data
-Data should be stoered in the following format for Cosmx/ CODEX/ IMC
-New data classes can be created with ease (See )
-### Train
-
-### Reason
