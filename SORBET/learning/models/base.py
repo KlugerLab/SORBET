@@ -27,12 +27,12 @@ class BaseGraphModel(torch.nn.Module):
         """
         raise NotImplementedError
 
-    # " Helpful for predictions without attached gradients." might be confusing
     @abstractmethod
     def predict(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         """Function to predict outputs for a given input. 
         
-        Helpful for predictions without attached gradients.
+        Helpful for predictions of test data or other data where a learning step is not necessary 
+        (e.g., gradients not attached).  
 
         Args:
             x: cell data associated. Equivalent to the Data.x attribute in torch_geomtric.data.Data.
@@ -58,7 +58,6 @@ class BaseGraphModel(torch.nn.Module):
         Returns: 
             Loss function computed for a given set of graphs and predictions.  
         """
-
         raise NotImplementedError
 
     @abstractmethod
@@ -75,10 +74,8 @@ class BaseGraphModel(torch.nn.Module):
         Returns: 
             Computed cell embedding of input cells. Of same row size as x. 
         """
+        raise NotImplementedError
 
-        pass
-
-    # why are these in pass and not "raise NotImplementedError". Are they optional for downstream task? Do they have a default?
     @abstractmethod
     def get_subgraph_embedding(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> torch.Tensor:
         """Function to extract the subgraph embeddings of a series of input graphs.
@@ -93,7 +90,7 @@ class BaseGraphModel(torch.nn.Module):
         Returns: 
             Model predictions for the given data. 
         """
-        pass
+        raise NotImplementedError
 
     @staticmethod
     @abstractmethod

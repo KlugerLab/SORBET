@@ -25,12 +25,12 @@ _BasicGCNSpecification = StructureSpecification(
 
 class GCNStandardSupervised(BaseGraphModel):
     """GCN model with the following structure:
-        - GCN Conv Layers (`conv_channels`)
-        - Pooling Layer (default: global_mean)
-        - Linear Layers (`out_channels`)
+        - GCN Conv Layers (`conv_channels`): Layer widths for convolutional layers
+        - Pooling Layer (default: global_mean): choice of pooling function. See parse_pooling_function in _utils.py for options.
+        - Linear Layers (`out_channels`): Layer widths for output fully-connected neural network for processing node representations.
+
+    NOTE: The corresponding initialization argument is placed in parenthesis.
     """
-# The fact that these are not typed or checked might be confusing. might even be worth while to put in docstring. Also in channels and out channels I assume need to be of same length, might also be checked and documented.
- 
     def __init__(self, 
             in_channel: int,
             conv_channels: List[int],
